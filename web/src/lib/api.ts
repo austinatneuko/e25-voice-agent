@@ -70,12 +70,6 @@ export interface InterviewProgress {
 	currentStepName: string;
 }
 
-export interface InterviewResponse {
-	nextQuestion: InterviewQuestion | null;
-	progress: InterviewProgress;
-	completed: boolean;
-}
-
 export interface ChatResponse {
 	response: string;
 	plan: { goal: string; socialMove: string; toneGuidance: string };
@@ -84,36 +78,61 @@ export interface ChatResponse {
 export const api = {
 	ingestText: (text: string, title?: string) =>
 		post<IngestResult>('/api/ingest/text', { text, title }),
-	ingestSubstack: (url: string) =>
-		post<IngestResult>('/api/ingest/substack', { url }),
-	ingestX: (handle: string) =>
-		post<IngestResult>('/api/ingest/x', { handle }),
+	ingestSubstack: (url: string) => post<IngestResult>('/api/ingest/substack', { url }),
+	ingestX: (handle: string) => post<IngestResult>('/api/ingest/x', { handle }),
 	analyze: () => post<AnalysisResult>('/api/ingest/analyze'),
-
 	getSamples: () => get<{ total: number; samples: SamplePreview[] }>('/api/profile/samples'),
+	getWritingProfile: () =>
+		get<{
+			antiPatterns: Array<{ pattern: string; reason: string; example?: string }>;
+			rawSummary: string;
+			styleMarkers: Record<string, unknown>;
+		}>('/api/profile/writing'),
 
 	interviewStart: () =>
-		post<{ started: boolean } & InterviewResponse>('/api/interview/start'),
-	interviewNext: () =>
-		get<{ question: InterviewQuestion | null } & InterviewResponse>('/api/interview/next'),
-	interviewAnswer: (questionId: string, answer: string) =>
-		post<{ recorded: boolean } & InterviewResponse>('/api/interview/answer', {
-			questionId,
-			answer,
-		}),
-	interviewSkip: (questionId: string) => post('/api/interview/skip', { questionId }),
-	buildProfile: () =>
 		post<{
-			built: boolean;
-			identity: Record<string, string>;
-			antiPatterns: number;
-			soulMdPreview: string;
-		}>('/api/interview/build-profile'),
+			started: boolean;
+			nextQuestion: InterviewQuestion | null;
+			progress: InterviewProgress;
+			soulMd: string | null;
+		}>('/api/interview/start'),
+	interviewAnswer: (questionId: string, answer: string) =>
+		post<{
+			recorded: boolean;
+			nextQuestion: InterviewQuestion | null;
+			progress: InterviewProgress;
+			completed: boolean;
+			soulMd: string | null;
+		}>('/api/interview/answer', { questionId, answer }),
+	interviewSkip: (questionId: string) =>
+		post<{
+			skipped: boolean;
+			nextQuestion: InterviewQuestion | null;
+			progress: InterviewProgress;
+			completed: boolean;
+		}>('/api/interview/skip', { questionId }),
+	buildProfile: () =>
+		post<{ built: boolean; soulMd: string }>('/api/interview/build-profile'),
 
 	chat: (message: string) => post<ChatResponse>('/api/chat', { message }),
 	feedback: (correction: string) =>
 		post<{ stored: boolean; totalCorrections: number }>('/api/chat/feedback', { correction }),
 	clearHistory: () => del('/api/chat/history'),
-
 	soulMd: () => getText('/api/profile/soul'),
+
+	tts: async (text: string): Promise<HTMLAudioElement | null> => {
+		try {
+			const res = await fetch('/api/voice/tts', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ text }),
+			});
+			if (!res.ok) return null;
+			const blob = await res.blob();
+			const url = URL.createObjectURL(blob);
+			return new Audio(url);
+		} catch {
+			return null;
+		}
+	},
 };

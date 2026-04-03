@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
+import { useVoiceInput } from '@/lib/use-voice-input';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -19,11 +20,17 @@ export function ChatView({ onCorrection }: { onCorrection?: () => void }) {
 	const [loading, setLoading] = useState(false);
 	const [correcting, setCorrecting] = useState<number | null>(null);
 	const [correction, setCorrection] = useState('');
+	const [ttsEnabled, setTtsEnabled] = useState(false);
 	const scrollRef = useRef<HTMLDivElement>(null);
+	const voice = useVoiceInput();
 
 	useEffect(() => {
 		scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
 	}, [messages]);
+
+	useEffect(() => {
+		if (voice.transcript) setInput(voice.transcript);
+	}, [voice.transcript]);
 
 	async function send() {
 		if (!input.trim() || loading) return;
@@ -38,6 +45,11 @@ export function ChatView({ onCorrection }: { onCorrection?: () => void }) {
 				...prev,
 				{ role: 'assistant', content: res.response, plan: res.plan },
 			]);
+			// TTS for agent response
+			if (ttsEnabled) {
+				const audio = await api.tts(res.response);
+				audio?.play();
+			}
 		} catch {
 			setMessages((prev) => [
 				...prev,
@@ -54,7 +66,7 @@ export function ChatView({ onCorrection }: { onCorrection?: () => void }) {
 		setMessages((prev) =>
 			prev.map((m, i) =>
 				i === idx
-					? { ...m, content: m.content + '\n\n[corrected: ' + correction + ']' }
+					? { ...m, content: m.content + '\n\n✏️ ' + correction }
 					: m,
 			),
 		);
@@ -71,12 +83,12 @@ export function ChatView({ onCorrection }: { onCorrection?: () => void }) {
 	}
 
 	return (
-		<div className="flex flex-col h-[calc(100vh-3.25rem)]">
+		<div className="flex flex-col h-[calc(100vh-2.75rem)]">
 			<ScrollArea className="flex-1 p-4">
 				<div className="space-y-4 max-w-2xl mx-auto">
 					{messages.length === 0 && (
 						<p className="text-muted-foreground text-center py-12 text-sm">
-							start chatting — corrections update the soul in real time
+							talk to your agent — corrections update the soul in real time
 						</p>
 					)}
 					{messages.map((msg, i) => (
@@ -120,7 +132,7 @@ export function ChatView({ onCorrection }: { onCorrection?: () => void }) {
 												<Textarea
 													value={correction}
 													onChange={(e) => setCorrection(e.target.value)}
-													placeholder="what felt off?"
+													placeholder="what felt off? this becomes a lesson..."
 													className="text-xs h-16"
 												/>
 												<div className="flex flex-col gap-1">
@@ -179,7 +191,7 @@ export function ChatView({ onCorrection }: { onCorrection?: () => void }) {
 					<div ref={scrollRef} />
 				</div>
 			</ScrollArea>
-			<div className="border-t p-4 shrink-0">
+			<div className="border-t p-3 shrink-0">
 				<div className="flex gap-2 max-w-2xl mx-auto">
 					<Textarea
 						value={input}
@@ -189,6 +201,25 @@ export function ChatView({ onCorrection }: { onCorrection?: () => void }) {
 						className="resize-none h-12"
 						disabled={loading}
 					/>
+					{voice.supported && (
+						<Button
+							variant={voice.listening ? 'destructive' : 'outline'}
+							onClick={voice.listening ? voice.stop : voice.start}
+							className="shrink-0"
+							size="sm"
+						>
+							{voice.listening ? '⏹' : '🎤'}
+						</Button>
+					)}
+					<Button
+						variant={ttsEnabled ? 'default' : 'outline'}
+						onClick={() => setTtsEnabled(!ttsEnabled)}
+						className="shrink-0"
+						size="sm"
+						title={ttsEnabled ? 'voice output on' : 'voice output off'}
+					>
+						{ttsEnabled ? '🔊' : '🔇'}
+					</Button>
 					<Button onClick={send} disabled={loading || !input.trim()}>
 						send
 					</Button>

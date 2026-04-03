@@ -14,9 +14,23 @@ import { generateSoulMd } from '../voice/soul-generator.js';
 
 const interview = new Hono();
 
+/** Rebuild soul.md from current state (called after each answer) */
+function rebuildSoul() {
+	if (!state.interviewState || state.interviewState.answers.length === 0) return;
+	state.voiceProfile = buildVoiceProfile(state.writingProfile, state.interviewState.answers);
+	state.soulMd = generateSoulMd(state.voiceProfile);
+}
+
 /** POST /api/interview/start — Begin the interview */
 interview.post('/start', async (c) => {
 	state.interviewState = createInterviewState(state.writingProfile ?? undefined);
+
+	// If we have a writing profile, build initial soul from it
+	if (state.writingProfile) {
+		state.voiceProfile = buildVoiceProfile(state.writingProfile, []);
+		state.soulMd = generateSoulMd(state.voiceProfile);
+	}
+
 	const next = getNextQuestion(state.interviewState);
 	const progress = getProgress(state.interviewState);
 
@@ -24,6 +38,7 @@ interview.post('/start', async (c) => {
 		started: true,
 		nextQuestion: next,
 		progress,
+		soulMd: state.soulMd,
 	});
 });
 
@@ -38,12 +53,13 @@ interview.get('/next', async (c) => {
 
 	return c.json({
 		question: next,
+		nextQuestion: next,
 		progress,
 		completed: state.interviewState.completed,
 	});
 });
 
-/** POST /api/interview/answer — Submit an answer */
+/** POST /api/interview/answer — Submit an answer, rebuild soul incrementally */
 interview.post('/answer', async (c) => {
 	if (!state.interviewState) {
 		return c.json({ error: 'Interview not started' }, 400);
@@ -58,6 +74,9 @@ interview.post('/answer', async (c) => {
 		return c.json({ error: String(e) }, 400);
 	}
 
+	// Rebuild soul after every answer so it updates live
+	rebuildSoul();
+
 	const next = getNextQuestion(state.interviewState);
 	const progress = getProgress(state.interviewState);
 
@@ -66,6 +85,7 @@ interview.post('/answer', async (c) => {
 		nextQuestion: next,
 		progress,
 		completed: state.interviewState.completed,
+		soulMd: state.soulMd,
 	});
 });
 
@@ -86,6 +106,7 @@ interview.post('/skip', async (c) => {
 		skipped: true,
 		nextQuestion: next,
 		progress,
+		completed: state.interviewState.completed,
 	});
 });
 
@@ -107,12 +128,17 @@ interview.post('/self-eval', async (c) => {
 
 /** POST /api/interview/build-profile — Build voice profile from interview + writing */
 interview.post('/build-profile', async (c) => {
-	if (!state.interviewState || state.interviewState.answers.length === 0) {
-		return c.json({ error: 'No interview answers yet' }, 400);
-	}
+	rebuildSoul();
 
-	state.voiceProfile = buildVoiceProfile(state.writingProfile, state.interviewState.answers);
-	state.soulMd = generateSoulMd(state.voiceProfile);
+	if (!state.voiceProfile || !state.soulMd) {
+		// Build from writing profile alone if no interview answers
+		if (state.writingProfile) {
+			state.voiceProfile = buildVoiceProfile(state.writingProfile, []);
+			state.soulMd = generateSoulMd(state.voiceProfile);
+		} else {
+			return c.json({ error: 'No data to build profile from' }, 400);
+		}
+	}
 
 	return c.json({
 		built: true,
@@ -120,7 +146,7 @@ interview.post('/build-profile', async (c) => {
 		antiPatterns: state.voiceProfile.antiPatterns.length,
 		hasSocialModes: !!state.voiceProfile.socialModes,
 		personalityKeys: Object.keys(state.voiceProfile.personality),
-		soulMdPreview: state.soulMd.slice(0, 500),
+		soulMd: state.soulMd,
 	});
 });
 
