@@ -15,6 +15,19 @@ profile.get('/', async (c) => {
 	});
 });
 
+/** GET /api/profile/samples — Preview ingested writing samples */
+profile.get('/samples', async (c) => {
+	return c.json({
+		total: state.writingSamples.length,
+		samples: state.writingSamples.map((s) => ({
+			source: s.source,
+			title: s.title,
+			preview: s.text.slice(0, 200) + (s.text.length > 200 ? '...' : ''),
+			wordCount: s.text.split(/\s+/).length,
+		})),
+	});
+});
+
 /** GET /api/profile/soul — Get the generated SOUL.md */
 profile.get('/soul', async (c) => {
 	if (!state.soulMd) {

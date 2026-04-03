@@ -1,99 +1,120 @@
 import { useState } from 'react';
-import { api } from '@/lib/api';
+import {
+	type AnalysisResult,
+	type InterviewProgress,
+	type InterviewQuestion,
+	type SamplePreview,
+	api,
+} from '@/lib/api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 
-type Phase = 'ingest' | 'analyze' | 'interview' | 'done';
-
-interface InterviewQuestion {
-	id: string;
-	question: string;
-	stepName: string;
-	required: boolean;
-}
+type Phase = 'ingest' | 'interview' | 'done';
 
 export function TrainView({ onComplete }: { onComplete: () => void }) {
 	const [phase, setPhase] = useState<Phase>('ingest');
 	const [text, setText] = useState('');
 	const [substackUrl, setSubstackUrl] = useState('');
 	const [xHandle, setXHandle] = useState('');
-	const [sampleCount, setSampleCount] = useState(0);
-	const [analysisSummary, setAnalysisSummary] = useState('');
+	const [samples, setSamples] = useState<SamplePreview[]>([]);
+	const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
 	const [loading, setLoading] = useState(false);
-	const [status, setStatus] = useState('');
+	const [loadingAction, setLoadingAction] = useState('');
+	const [error, setError] = useState('');
 
 	// Interview state
 	const [currentQuestion, setCurrentQuestion] = useState<InterviewQuestion | null>(null);
 	const [answer, setAnswer] = useState('');
-	const [progress, setProgress] = useState({ answered: 0, total: 0, currentStepName: '' });
+	const [progress, setProgress] = useState<InterviewProgress>({
+		answered: 0,
+		total: 0,
+		currentStepName: '',
+	});
 	const [completed, setCompleted] = useState(false);
 	const [soulMdPreview, setSoulMdPreview] = useState('');
+
+	async function refreshSamples() {
+		try {
+			const res = await api.getSamples();
+			setSamples(res.samples);
+		} catch {
+			// ignore
+		}
+	}
 
 	async function ingestText() {
 		if (!text.trim()) return;
 		setLoading(true);
+		setLoadingAction('adding text...');
+		setError('');
 		try {
-			await api.ingestText(text, 'pasted text');
-			setSampleCount((c) => c + 1);
+			const res = await api.ingestText(text, 'pasted text');
 			setText('');
-			setStatus('text ingested');
+			await refreshSamples();
+		} catch (e) {
+			setError(String(e));
 		} finally {
 			setLoading(false);
+			setLoadingAction('');
 		}
 	}
 
 	async function ingestSubstack() {
 		if (!substackUrl.trim()) return;
 		setLoading(true);
-		setStatus('fetching substack...');
+		setLoadingAction('fetching substack posts...');
+		setError('');
 		try {
-			const res = (await api.ingestSubstack(substackUrl)) as { ingested: number };
-			setSampleCount((c) => c + res.ingested);
+			await api.ingestSubstack(substackUrl);
 			setSubstackUrl('');
-			setStatus(`${res.ingested} posts ingested`);
-		} catch {
-			setStatus('substack fetch failed');
+			await refreshSamples();
+		} catch (e) {
+			setError(`substack failed: ${e}`);
 		} finally {
 			setLoading(false);
+			setLoadingAction('');
 		}
 	}
 
 	async function ingestX() {
 		if (!xHandle.trim()) return;
 		setLoading(true);
-		setStatus('fetching tweets...');
+		setLoadingAction('fetching tweets...');
+		setError('');
 		try {
-			const res = (await api.ingestX(xHandle)) as { ingested: number };
-			setSampleCount((c) => c + res.ingested);
+			await api.ingestX(xHandle.replace('@', ''));
 			setXHandle('');
-			setStatus(`${res.ingested} tweets ingested`);
-		} catch {
-			setStatus('tweet fetch failed');
+			await refreshSamples();
+		} catch (e) {
+			setError(`tweet fetch failed: ${e}`);
 		} finally {
 			setLoading(false);
+			setLoadingAction('');
 		}
 	}
 
 	async function runAnalysis() {
 		setLoading(true);
-		setStatus('analyzing voice...');
+		setLoadingAction('analyzing voice (this takes 10-20s)...');
+		setError('');
 		try {
 			const res = await api.analyze();
-			setAnalysisSummary(res.summary);
-			setPhase('interview');
+			setAnalysis(res);
 			// Start interview
 			const iv = await api.interviewStart();
 			setCurrentQuestion(iv.nextQuestion);
 			setProgress(iv.progress);
-			setStatus('');
-		} catch {
-			setStatus('analysis failed');
+			setPhase('interview');
+		} catch (e) {
+			setError(`analysis failed: ${e}`);
 		} finally {
 			setLoading(false);
+			setLoadingAction('');
 		}
 	}
 
@@ -106,6 +127,8 @@ export function TrainView({ onComplete }: { onComplete: () => void }) {
 			setCurrentQuestion(res.nextQuestion);
 			setProgress(res.progress);
 			setCompleted(res.completed);
+		} catch (e) {
+			setError(String(e));
 		} finally {
 			setLoading(false);
 		}
@@ -115,19 +138,23 @@ export function TrainView({ onComplete }: { onComplete: () => void }) {
 		if (!currentQuestion) return;
 		await api.interviewSkip(currentQuestion.id);
 		const res = await api.interviewNext();
-		setCurrentQuestion(res.question);
+		setCurrentQuestion(res.question ?? res.nextQuestion);
 		setProgress(res.progress);
 		setCompleted(res.completed);
 	}
 
 	async function buildProfile() {
 		setLoading(true);
+		setLoadingAction('building voice profile...');
 		try {
 			const res = await api.buildProfile();
 			setSoulMdPreview(res.soulMdPreview);
 			setPhase('done');
+		} catch (e) {
+			setError(String(e));
 		} finally {
 			setLoading(false);
+			setLoadingAction('');
 		}
 	}
 
@@ -138,18 +165,23 @@ export function TrainView({ onComplete }: { onComplete: () => void }) {
 		}
 	}
 
+	// === DONE: show preview and launch button ===
 	if (phase === 'done') {
 		return (
 			<div className="max-w-2xl mx-auto p-6 space-y-4">
 				<Card>
 					<CardHeader>
 						<CardTitle>voice profile built</CardTitle>
-						<CardDescription>your agent is ready to chat</CardDescription>
+						<CardDescription>
+							{samples.length} samples analyzed, {progress.answered} interview questions answered
+						</CardDescription>
 					</CardHeader>
 					<CardContent className="space-y-4">
-						<pre className="text-xs bg-muted p-4 rounded-md overflow-auto max-h-64 whitespace-pre-wrap">
-							{soulMdPreview}...
-						</pre>
+						<ScrollArea className="h-64">
+							<pre className="text-xs bg-muted p-4 rounded-md whitespace-pre-wrap">
+								{soulMdPreview}...
+							</pre>
+						</ScrollArea>
 						<Button onClick={onComplete} className="w-full">
 							start chatting
 						</Button>
@@ -159,13 +191,28 @@ export function TrainView({ onComplete }: { onComplete: () => void }) {
 		);
 	}
 
+	// === INTERVIEW ===
 	if (phase === 'interview') {
 		return (
 			<div className="max-w-2xl mx-auto p-6 space-y-4">
-				{analysisSummary && (
+				{analysis && (
 					<Card>
-						<CardContent className="p-4">
-							<p className="text-sm text-muted-foreground">{analysisSummary}</p>
+						<CardHeader>
+							<CardTitle className="text-base">voice analysis</CardTitle>
+						</CardHeader>
+						<CardContent className="space-y-2">
+							<p className="text-sm text-muted-foreground">{analysis.summary}</p>
+							<div className="flex gap-2 flex-wrap">
+								<Badge variant="outline">
+									{analysis.antiPatterns} anti-patterns found
+								</Badge>
+								<Badge variant="outline">
+									avg {analysis.styleMarkers.avgSentenceLength} words/sentence
+								</Badge>
+								{analysis.styleMarkers.usesAllLowercase && (
+									<Badge variant="outline">all lowercase</Badge>
+								)}
+							</div>
 						</CardContent>
 					</Card>
 				)}
@@ -182,11 +229,16 @@ export function TrainView({ onComplete }: { onComplete: () => void }) {
 						</div>
 					</CardHeader>
 					<CardContent className="space-y-4">
+						{error && (
+							<p className="text-sm text-destructive">{error}</p>
+						)}
 						{completed ? (
 							<div className="space-y-4">
-								<p className="text-sm">interview complete. ready to build your voice profile.</p>
+								<p className="text-sm">
+									interview complete. ready to build your voice profile.
+								</p>
 								<Button onClick={buildProfile} disabled={loading} className="w-full">
-									{loading ? 'building...' : 'build voice profile'}
+									{loading ? loadingAction : 'build voice profile'}
 								</Button>
 							</div>
 						) : currentQuestion ? (
@@ -201,7 +253,11 @@ export function TrainView({ onComplete }: { onComplete: () => void }) {
 									rows={3}
 								/>
 								<div className="flex gap-2">
-									<Button onClick={submitAnswer} disabled={loading || !answer.trim()} className="flex-1">
+									<Button
+										onClick={submitAnswer}
+										disabled={loading || !answer.trim()}
+										className="flex-1"
+									>
 										{loading ? 'saving...' : 'answer'}
 									</Button>
 									{!currentQuestion.required && (
@@ -218,6 +274,7 @@ export function TrainView({ onComplete }: { onComplete: () => void }) {
 		);
 	}
 
+	// === INGEST ===
 	return (
 		<div className="max-w-2xl mx-auto p-6 space-y-4">
 			<Card>
@@ -236,7 +293,12 @@ export function TrainView({ onComplete }: { onComplete: () => void }) {
 							rows={4}
 							className="resize-none"
 						/>
-						<Button onClick={ingestText} disabled={loading || !text.trim()} variant="outline" className="w-full">
+						<Button
+							onClick={ingestText}
+							disabled={loading || !text.trim()}
+							variant="outline"
+							className="w-full"
+						>
 							add text
 						</Button>
 					</div>
@@ -249,7 +311,11 @@ export function TrainView({ onComplete }: { onComplete: () => void }) {
 							onChange={(e) => setSubstackUrl(e.target.value)}
 							placeholder="substack url (e.g. yourname.substack.com)"
 						/>
-						<Button onClick={ingestSubstack} disabled={loading || !substackUrl.trim()} variant="outline">
+						<Button
+							onClick={ingestSubstack}
+							disabled={loading || !substackUrl.trim()}
+							variant="outline"
+						>
 							fetch
 						</Button>
 					</div>
@@ -260,30 +326,67 @@ export function TrainView({ onComplete }: { onComplete: () => void }) {
 							onChange={(e) => setXHandle(e.target.value)}
 							placeholder="x handle (e.g. elonmusk)"
 						/>
-						<Button onClick={ingestX} disabled={loading || !xHandle.trim()} variant="outline">
+						<Button
+							onClick={ingestX}
+							disabled={loading || !xHandle.trim()}
+							variant="outline"
+						>
 							fetch
 						</Button>
 					</div>
 
-					{status && (
-						<p className="text-sm text-muted-foreground">{status}</p>
+					{loading && loadingAction && (
+						<p className="text-sm text-muted-foreground animate-pulse">{loadingAction}</p>
 					)}
-
-					{sampleCount > 0 && (
-						<>
-							<Separator />
-							<div className="flex items-center justify-between">
-								<span className="text-sm">
-									{sampleCount} sample{sampleCount > 1 ? 's' : ''} loaded
-								</span>
-								<Button onClick={runAnalysis} disabled={loading}>
-									{loading ? 'analyzing...' : 'analyze & start interview'}
-								</Button>
-							</div>
-						</>
-					)}
+					{error && <p className="text-sm text-destructive">{error}</p>}
 				</CardContent>
 			</Card>
+
+			{/* Sample preview */}
+			{samples.length > 0 && (
+				<Card>
+					<CardHeader>
+						<div className="flex items-center justify-between">
+							<CardTitle className="text-base">
+								{samples.length} sample{samples.length > 1 ? 's' : ''} ingested
+							</CardTitle>
+							<span className="text-xs text-muted-foreground">
+								{samples.reduce((sum, s) => sum + s.wordCount, 0)} words total
+							</span>
+						</div>
+					</CardHeader>
+					<CardContent>
+						<ScrollArea className="max-h-64">
+							<div className="space-y-3">
+								{samples.map((s, i) => (
+									<div key={i} className="border-b pb-2 last:border-0">
+										<div className="flex items-center gap-2 mb-1">
+											<Badge variant="outline" className="text-[10px]">
+												{s.source}
+											</Badge>
+											{s.title && (
+												<span className="text-xs font-medium truncate">{s.title}</span>
+											)}
+											<span className="text-[10px] text-muted-foreground ml-auto">
+												{s.wordCount}w
+											</span>
+										</div>
+										<p className="text-xs text-muted-foreground leading-relaxed">
+											{s.preview}
+										</p>
+									</div>
+								))}
+							</div>
+						</ScrollArea>
+					</CardContent>
+				</Card>
+			)}
+
+			{samples.length > 0 && (
+				<Button onClick={runAnalysis} disabled={loading} className="w-full" size="lg">
+					{loading ? loadingAction : `analyze ${samples.length} samples & start interview`}
+				</Button>
+			)}
 		</div>
 	);
 }

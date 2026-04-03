@@ -13,7 +13,7 @@ interface Message {
 	plan?: { goal: string; socialMove: string; toneGuidance: string };
 }
 
-export function ChatView() {
+export function ChatView({ onCorrection }: { onCorrection?: () => void }) {
 	const [messages, setMessages] = useState<Message[]>([]);
 	const [input, setInput] = useState('');
 	const [loading, setLoading] = useState(false);
@@ -53,11 +53,14 @@ export function ChatView() {
 		await api.feedback(correction.trim());
 		setMessages((prev) =>
 			prev.map((m, i) =>
-				i === idx ? { ...m, content: m.content + '\n\n[corrected: ' + correction + ']' } : m,
+				i === idx
+					? { ...m, content: m.content + '\n\n[corrected: ' + correction + ']' }
+					: m,
 			),
 		);
 		setCorrection('');
 		setCorrecting(null);
+		onCorrection?.();
 	}
 
 	function handleKeyDown(e: React.KeyboardEvent) {
@@ -68,16 +71,19 @@ export function ChatView() {
 	}
 
 	return (
-		<div className="flex flex-col h-[calc(100vh-8rem)]">
+		<div className="flex flex-col h-[calc(100vh-3.25rem)]">
 			<ScrollArea className="flex-1 p-4">
 				<div className="space-y-4 max-w-2xl mx-auto">
 					{messages.length === 0 && (
-						<p className="text-muted-foreground text-center py-12">
-							start chatting with your trained voice agent
+						<p className="text-muted-foreground text-center py-12 text-sm">
+							start chatting — corrections update the soul in real time
 						</p>
 					)}
 					{messages.map((msg, i) => (
-						<div key={i} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : ''}`}>
+						<div
+							key={i}
+							className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : ''}`}
+						>
 							{msg.role === 'assistant' && (
 								<Avatar className="h-8 w-8 shrink-0">
 									<AvatarFallback className="bg-primary text-primary-foreground text-xs">
@@ -118,7 +124,11 @@ export function ChatView() {
 													className="text-xs h-16"
 												/>
 												<div className="flex flex-col gap-1">
-													<Button size="sm" variant="outline" onClick={() => submitCorrection(i)}>
+													<Button
+														size="sm"
+														variant="outline"
+														onClick={() => submitCorrection(i)}
+													>
 														save
 													</Button>
 													<Button
@@ -159,7 +169,9 @@ export function ChatView() {
 							</Avatar>
 							<Card className="bg-muted">
 								<CardContent className="p-3">
-									<p className="text-sm text-muted-foreground animate-pulse">thinking...</p>
+									<p className="text-sm text-muted-foreground animate-pulse">
+										thinking...
+									</p>
 								</CardContent>
 							</Card>
 						</div>
@@ -167,7 +179,7 @@ export function ChatView() {
 					<div ref={scrollRef} />
 				</div>
 			</ScrollArea>
-			<div className="border-t p-4">
+			<div className="border-t p-4 shrink-0">
 				<div className="flex gap-2 max-w-2xl mx-auto">
 					<Textarea
 						value={input}

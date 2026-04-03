@@ -1,41 +1,44 @@
 import { useState } from 'react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ChatView } from '@/components/ChatView';
 import { SoulView } from '@/components/SoulView';
 import { TrainView } from '@/components/TrainView';
 
+type AppPhase = 'train' | 'live';
+
 function App() {
-	const [tab, setTab] = useState('train');
+	const [phase, setPhase] = useState<AppPhase>('train');
+	const [soulVersion, setSoulVersion] = useState(0);
+
+	if (phase === 'live') {
+		return (
+			<div className="min-h-screen bg-background flex flex-col">
+				<header className="border-b px-6 py-3 flex items-center justify-between shrink-0">
+					<h1 className="text-sm font-medium tracking-tight">voice agent trainer</h1>
+					<button
+						onClick={() => setPhase('train')}
+						className="text-xs text-muted-foreground hover:text-foreground"
+					>
+						back to training
+					</button>
+				</header>
+				<div className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_380px] min-h-0">
+					<div className="min-h-0 border-r">
+						<ChatView onCorrection={() => setSoulVersion((v) => v + 1)} />
+					</div>
+					<div className="min-h-0 hidden lg:block">
+						<SoulView refreshKey={soulVersion} />
+					</div>
+				</div>
+			</div>
+		);
+	}
 
 	return (
 		<div className="min-h-screen bg-background">
-			<header className="border-b px-6 py-3 flex items-center justify-between">
+			<header className="border-b px-6 py-3">
 				<h1 className="text-sm font-medium tracking-tight">voice agent trainer</h1>
 			</header>
-			<Tabs value={tab} onValueChange={setTab} className="w-full">
-				<div className="border-b px-6">
-					<TabsList className="bg-transparent h-10">
-						<TabsTrigger value="train" className="text-xs">
-							train
-						</TabsTrigger>
-						<TabsTrigger value="chat" className="text-xs">
-							chat
-						</TabsTrigger>
-						<TabsTrigger value="soul" className="text-xs">
-							soul.md
-						</TabsTrigger>
-					</TabsList>
-				</div>
-				<TabsContent value="train" className="mt-0">
-					<TrainView onComplete={() => setTab('chat')} />
-				</TabsContent>
-				<TabsContent value="chat" className="mt-0">
-					<ChatView />
-				</TabsContent>
-				<TabsContent value="soul" className="mt-0">
-					<SoulView />
-				</TabsContent>
-			</Tabs>
+			<TrainView onComplete={() => setPhase('live')} />
 		</div>
 	);
 }

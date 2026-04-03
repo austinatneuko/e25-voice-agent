@@ -1,33 +1,30 @@
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
-export function SoulView() {
-	const [soul, setSoul] = useState<string | null>(null);
+export function SoulView({ refreshKey }: { refreshKey: number }) {
+	const [soul, setSoul] = useState<string>('');
 
 	useEffect(() => {
-		api.soulMd().then(setSoul).catch(() => setSoul(null));
-	}, []);
+		api.soulMd().then(setSoul).catch(() => setSoul(''));
+	}, [refreshKey]);
 
 	return (
-		<div className="max-w-2xl mx-auto p-6">
-			<Card>
-				<CardHeader>
-					<CardTitle>SOUL.md</CardTitle>
-				</CardHeader>
-				<CardContent>
-					{soul ? (
-						<ScrollArea className="h-[calc(100vh-16rem)]">
-							<pre className="text-sm whitespace-pre-wrap font-mono">{soul}</pre>
-						</ScrollArea>
-					) : (
-						<p className="text-sm text-muted-foreground">
-							no voice profile built yet. complete the training flow first.
-						</p>
-					)}
-				</CardContent>
-			</Card>
+		<div className="flex flex-col h-[calc(100vh-3.25rem)]">
+			<div className="px-4 py-3 border-b shrink-0">
+				<h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+					soul.md
+				</h2>
+			</div>
+			<ScrollArea className="flex-1 p-4">
+				{soul ? (
+					<pre className="text-xs whitespace-pre-wrap font-mono leading-relaxed">
+						{soul}
+					</pre>
+				) : (
+					<p className="text-xs text-muted-foreground">loading...</p>
+				)}
+			</ScrollArea>
 		</div>
 	);
 }
