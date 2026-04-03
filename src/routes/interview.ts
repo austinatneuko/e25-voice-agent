@@ -99,7 +99,7 @@ interview.post('/self-eval', async (c) => {
 	const result = await generateSelfEval(
 		state.interviewState.answers,
 		openai,
-		'google/gemini-2.5-flash',
+		'minimax/minimax-m2.7',
 	);
 
 	return c.json(result);

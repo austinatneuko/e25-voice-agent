@@ -23,7 +23,7 @@ chat.post('/', async (c) => {
 	if (!message) return c.json({ error: 'message required' }, 400);
 
 	const openai = getOpenAIClient();
-	const model = 'google/gemini-2.5-flash';
+	const model = 'minimax/minimax-m2.7';
 
 	// Simulacra loop: perceive → context → plan → act
 	const context = assembleCognitiveContext(

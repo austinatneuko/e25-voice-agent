@@ -135,7 +135,7 @@ export function getProgress(state: InterviewState): {
 export async function generateSelfEval(
 	answers: InterviewAnswer[],
 	openai: OpenAI,
-	model = 'openrouter/auto',
+	model = 'minimax/minimax-m2.7',
 ): Promise<SelfEvalResult> {
 	const context = answers.map((a) => `Q: ${a.question}\nA: ${a.answer}`).join('\n\n');
 

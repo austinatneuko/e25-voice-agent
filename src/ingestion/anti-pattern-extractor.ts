@@ -26,7 +26,7 @@ Return ONLY valid JSON, no markdown or explanation.`;
 export async function extractAntiPatterns(
 	samples: WritingSample[],
 	openai: OpenAI,
-	model = 'openrouter/auto',
+	model = 'minimax/minimax-m2.7',
 ): Promise<AntiPattern[]> {
 	const sampleText = samples
 		.slice(0, 10) // Limit to 10 samples to stay within context

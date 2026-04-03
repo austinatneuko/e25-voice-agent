@@ -27,7 +27,7 @@ export async function generateVoiceSummary(
 	samples: WritingSample[],
 	styleMarkers: StyleMarkers,
 	openai: OpenAI,
-	model = 'openrouter/auto',
+	model = 'minimax/minimax-m2.7',
 ): Promise<{ summary: string; tone: StyleMarkers['tone'] }> {
 	const sampleText = samples
 		.slice(0, 8)

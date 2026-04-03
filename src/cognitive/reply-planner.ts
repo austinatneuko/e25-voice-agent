@@ -35,7 +35,7 @@ export async function planReply(
 	context: CognitiveContext,
 	userMessage: string,
 	openai: OpenAI,
-	model = 'openrouter/auto',
+	model = 'minimax/minimax-m2.7',
 ): Promise<ReplyPlan> {
 	const contextSummary = `IDENTITY (SOUL.md):
 ${context.identity}

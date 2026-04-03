@@ -72,7 +72,7 @@ ingest.post('/analyze', async (c) => {
 	}
 
 	const openai = getOpenAIClient();
-	const model = 'google/gemini-2.5-flash';
+	const model = 'minimax/minimax-m2.7';
 
 	// Statistical analysis
 	const styleMarkers = analyzeStyleMarkers(state.writingSamples);

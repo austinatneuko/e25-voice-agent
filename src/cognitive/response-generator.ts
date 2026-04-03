@@ -13,7 +13,7 @@ export async function generateResponse(
 	context: CognitiveContext,
 	userMessage: string,
 	openai: OpenAI,
-	model = 'openrouter/auto',
+	model = 'minimax/minimax-m2.7',
 ): Promise<string> {
 	const systemPrompt = buildSystemPrompt(plan, context);
 
