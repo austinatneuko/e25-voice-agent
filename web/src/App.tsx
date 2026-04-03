@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import type { AnalysisResult, InterviewProgress, InterviewQuestion, SamplePreview } from '@/lib/api';
 import { api } from '@/lib/api';
+import { ActionsPanel } from '@/components/ActionsPanel';
 import { ChatView } from '@/components/ChatView';
 import { AnalysisStep } from '@/components/steps/AnalysisStep';
 import { InterviewStep } from '@/components/steps/InterviewStep';
@@ -14,9 +15,11 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Textarea } from '@/components/ui/textarea';
 
 type AppStep = 'pick' | 'ingest' | 'analysis' | 'interview' | 'chat';
+type ChatMode = 'chat' | 'interview' | 'actions';
 
 function App() {
 	const [step, setStep] = useState<AppStep>('pick');
+	const [chatMode, setChatMode] = useState<ChatMode>('chat');
 	const [soulMd, setSoulMd] = useState('');
 	const [spriteState, setSpriteState] = useState<SpriteState>('idle');
 	const [selectedSources, setSelectedSources] = useState<Set<string>>(new Set());
@@ -387,14 +390,49 @@ function App() {
 		);
 	}
 
-	// === CHAT + SOUL ===
+	// === CHAT / INTERVIEW / ACTIONS + SOUL ===
 	return (
 		<Shell>
+			{/* Mode tabs */}
+			<div className="border-b px-6 flex items-center gap-1 shrink-0">
+				{[
+					{ id: 'chat' as ChatMode, label: 'chat' },
+					{ id: 'interview' as ChatMode, label: 'interview' },
+					{ id: 'actions' as ChatMode, label: 'create' },
+				].map((m) => (
+					<button
+						key={m.id}
+						onClick={() => setChatMode(m.id)}
+						className={`px-3 py-2 text-xs font-medium border-b-2 transition-colors ${
+							chatMode === m.id
+								? 'border-primary text-foreground'
+								: 'border-transparent text-muted-foreground hover:text-foreground'
+						}`}
+					>
+						{m.label}
+					</button>
+				))}
+			</div>
 			<div className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_380px] min-h-0">
 				<div className="min-h-0 border-r">
-					<ChatView onCorrection={refreshSoul} />
+					{chatMode === 'chat' && <ChatView onCorrection={refreshSoul} />}
+					{chatMode === 'interview' && (
+						<InterviewStep
+							question={currentQuestion}
+							progress={progress}
+							onAnswer={onInterviewAnswer}
+							onSkip={onInterviewSkip}
+							onSkipToChat={() => setChatMode('chat')}
+							spriteState={spriteState}
+						/>
+					)}
+					{chatMode === 'actions' && <ActionsPanel />}
 				</div>
-				<SoulPanel soulMd={soulMd} spriteState={spriteState} label="live" />
+				<SoulPanel
+					soulMd={soulMd}
+					spriteState={spriteState}
+					label={chatMode === 'interview' ? `updating — ${progress.answered} answers` : 'live'}
+				/>
 			</div>
 		</Shell>
 	);
