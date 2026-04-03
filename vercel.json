@@ -1,5 +1,7 @@
 {
-	"buildCommand": "npm run build && cd web && npm install && npx vite build",
+	"framework": null,
+	"installCommand": "npm install && cd web && npm install",
+	"buildCommand": "npm run build && cd web && npx vite build",
 	"outputDirectory": "web/dist",
 	"rewrites": [
 		{ "source": "/api/(.*)", "destination": "/api" },
