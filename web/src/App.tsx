@@ -14,15 +14,24 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Textarea } from '@/components/ui/textarea';
 
-type AppStep = 'pick' | 'ingest' | 'analysis' | 'interview' | 'chat';
+type AppStep = 'persona' | 'pick' | 'ingest' | 'analysis' | 'interview' | 'chat';
 type ChatMode = 'chat' | 'interview' | 'actions';
 
+interface PersonaInfo {
+	id: string;
+	name: string;
+	active: boolean;
+}
+
 function App() {
-	const [step, setStep] = useState<AppStep>('pick');
+	const [step, setStep] = useState<AppStep>('persona');
 	const [chatMode, setChatMode] = useState<ChatMode>('chat');
 	const [soulMd, setSoulMd] = useState('');
-	const [spriteState, setDittoState] = useState<DittoState>('idle' as DittoState);
+	const [spriteState, setSpriteState] = useState<DittoState>('idle' as DittoState);
 	const [selectedSources, setSelectedSources] = useState<Set<string>>(new Set());
+	const [personas, setPersonas] = useState<PersonaInfo[]>([]);
+	const [personaName, setPersonaName] = useState('');
+	const [activePersonaName, setActivePersonaName] = useState('');
 
 	// Ingest
 	const [samples, setSamples] = useState<SamplePreview[]>([]);
@@ -76,7 +85,7 @@ function App() {
 		if (!substackUrl.trim()) return;
 		setLoading(true);
 		setLoadingMsg('fetching substack posts...');
-		setDittoState('reading');
+		setSpriteState('reading');
 		setError('');
 		try {
 			await api.ingestSubstack(substackUrl);
@@ -87,7 +96,7 @@ function App() {
 		} finally {
 			setLoading(false);
 			setLoadingMsg('');
-			setDittoState('idle');
+			setSpriteState('idle');
 		}
 	}
 
@@ -95,7 +104,7 @@ function App() {
 		if (!xHandle.trim()) return;
 		setLoading(true);
 		setLoadingMsg(`fetching tweets from @${xHandle.replace('@', '')}...`);
-		setDittoState('reading');
+		setSpriteState('reading');
 		setError('');
 		try {
 			await api.ingestX(xHandle.replace('@', ''));
@@ -106,14 +115,14 @@ function App() {
 		} finally {
 			setLoading(false);
 			setLoadingMsg('');
-			setDittoState('idle');
+			setSpriteState('idle');
 		}
 	}
 
 	async function handleAnalyze() {
 		setLoading(true);
 		setLoadingMsg('analyzing voice (10-20s)...');
-		setDittoState('reading');
+		setSpriteState('reading');
 		setError('');
 		try {
 			const res = await api.analyze();
@@ -126,11 +135,11 @@ function App() {
 			setCurrentQuestion(iv.nextQuestion);
 			setProgress(iv.progress);
 			if (iv.soulMd) setSoulMd(iv.soulMd);
-			setDittoState('idle');
+			setSpriteState('idle');
 			setStep('analysis');
 		} catch (e) {
 			setError(`analysis failed: ${e}`);
-			setDittoState('idle');
+			setSpriteState('idle');
 		} finally {
 			setLoading(false);
 			setLoadingMsg('');
@@ -138,20 +147,20 @@ function App() {
 	}
 
 	async function onSkipToChat() {
-		setDittoState('writing');
+		setSpriteState('writing');
 		await api.buildProfile();
 		await refreshSoul();
-		setDittoState('idle');
+		setSpriteState('idle');
 		setStep('chat');
 	}
 
 	async function onInterviewAnswer(questionId: string, answer: string) {
-		setDittoState('writing');
+		setSpriteState('writing');
 		const res = await api.interviewAnswer(questionId, answer);
 		setCurrentQuestion(res.nextQuestion);
 		setProgress(res.progress);
 		if (res.soulMd) setSoulMd(res.soulMd);
-		setDittoState('listening');
+		setSpriteState('listening');
 	}
 
 	async function onInterviewSkip(questionId: string) {
@@ -171,7 +180,6 @@ function App() {
 
 	const showSoul = soulMd.length > 0;
 
-	// Group samples by source for display
 	const samplesBySource = samples.reduce<Record<string, SamplePreview[]>>((acc, s) => {
 		const key = s.source;
 		if (!acc[key]) acc[key] = [];
@@ -179,18 +187,126 @@ function App() {
 		return acc;
 	}, {});
 
-	// === SOURCE PICKER ===
-	if (step === 'pick') {
+	async function loadPersonas() {
+		try {
+			const res = await api.listPersonas();
+			setPersonas(res.personas);
+		} catch { /* ignore */ }
+	}
+
+	async function handleCreatePersona() {
+		if (!personaName.trim()) return;
+		await api.createPersona(personaName.trim());
+		setActivePersonaName(personaName.trim());
+		setPersonaName('');
+		setStep('pick');
+	}
+
+	async function handleSwitchPersona(id: string, name: string) {
+		await api.switchPersona(id);
+		setActivePersonaName(name);
+		// Reset frontend state for this persona
+		setSamples([]);
+		setSoulMd('');
+		setAnalysis(null);
+		setAntiPatterns([]);
+		setCurrentQuestion(null);
+		// Check if this persona already has data
+		await refreshSamples();
+		const soul = await api.soulMd();
+		if (soul) {
+			setSoulMd(soul);
+			setStep('chat');
+		} else if (samples.length > 0) {
+			setStep('ingest');
+		} else {
+			setStep('pick');
+		}
+	}
+
+	async function handleClearSamples() {
+		await api.clearSamples();
+		setSamples([]);
+		setAnalysis(null);
+		setAntiPatterns([]);
+	}
+
+	// === PERSONA SELECTION ===
+	if (step === 'persona') {
+		// Load personas on first render
+		if (personas.length === 0) {
+			loadPersonas();
+		}
+
 		return (
 			<Shell>
-				<div className="max-w-lg mx-auto p-8 space-y-8">
+				<div className="max-w-md mx-auto p-8 space-y-8">
 					<div className="text-center space-y-4 py-8">
 						<DittoSprite state="idle" size={96} />
 						<h1 className="text-3xl font-bold tracking-tight">
 							<span className="ditto-text">ditto</span>
 						</h1>
-						<p className="text-sm text-muted-foreground max-w-xs mx-auto leading-relaxed">
+						<p className="text-sm text-muted-foreground leading-relaxed">
 							an agent that actually, finally, sounds like you.
+						</p>
+					</div>
+
+					{/* Create new persona */}
+					<Card className="ditto-card">
+						<CardContent className="p-4 space-y-3">
+							<p className="text-sm font-medium">create a new persona</p>
+							<div className="flex gap-2">
+								<Input
+									value={personaName}
+									onChange={(e) => setPersonaName(e.target.value)}
+									placeholder="your name"
+									onKeyDown={(e) => e.key === 'Enter' && handleCreatePersona()}
+								/>
+								<Button onClick={handleCreatePersona} disabled={!personaName.trim()}>
+									create
+								</Button>
+							</div>
+						</CardContent>
+					</Card>
+
+					{/* Existing personas */}
+					{personas.length > 0 && (
+						<div className="space-y-2">
+							<p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">
+								your personas
+							</p>
+							{personas.map((p) => (
+								<button
+									key={p.id}
+									onClick={() => handleSwitchPersona(p.id, p.name)}
+									className="w-full border rounded-lg p-3 text-left transition-all hover:border-[var(--ditto)] hover:bg-[var(--ditto-soft)]/10 ditto-card flex items-center justify-between"
+								>
+									<span className="font-medium text-sm">{p.name}</span>
+									{p.active && (
+										<Badge variant="outline" style={{ borderColor: 'var(--ditto)', color: 'var(--ditto)' }} className="text-[10px]">
+											active
+										</Badge>
+									)}
+								</button>
+							))}
+						</div>
+					)}
+				</div>
+			</Shell>
+		);
+	}
+
+	// === SOURCE PICKER ===
+	if (step === 'pick') {
+		return (
+			<Shell personaName={activePersonaName} onSwitchPersona={() => setStep("persona")}>
+				<div className="max-w-lg mx-auto p-8 space-y-6">
+					<div className="text-center space-y-2 pt-4">
+						<p className="text-sm text-muted-foreground">
+							training <span className="font-medium" style={{ color: 'var(--ditto)' }}>{activePersonaName}</span>
+						</p>
+						<p className="text-xs text-muted-foreground">
+							how do you want to teach it your voice?
 						</p>
 					</div>
 					<div className="grid grid-cols-1 gap-3">
@@ -233,12 +349,8 @@ function App() {
 	// === INGEST (only shows selected sources) ===
 	if (step === 'ingest') {
 		return (
-			<Shell>
+			<Shell personaName={activePersonaName} onSwitchPersona={() => setStep("persona")}>
 				<div className="max-w-2xl mx-auto p-6 space-y-4">
-					<div className="flex justify-center py-2">
-						<DittoSprite state={spriteState} size={64} />
-					</div>
-
 					{selectedSources.has('text') && (
 						<Card>
 							<CardHeader><CardTitle className="text-sm">paste your writing</CardTitle></CardHeader>
@@ -309,9 +421,14 @@ function App() {
 									<CardTitle className="text-sm">
 										{samples.length} sample{samples.length > 1 ? 's' : ''} loaded
 									</CardTitle>
-									<span className="text-xs text-muted-foreground">
-										{samples.reduce((sum, s) => sum + s.wordCount, 0)} words total
-									</span>
+									<div className="flex items-center gap-2">
+										<span className="text-xs text-muted-foreground">
+											{samples.reduce((sum, s) => sum + s.wordCount, 0)}w
+										</span>
+										<Button variant="ghost" size="sm" className="text-xs h-6 px-2 text-destructive" onClick={handleClearSamples}>
+											clear all
+										</Button>
+									</div>
 								</div>
 							</CardHeader>
 							<CardContent>
@@ -359,12 +476,12 @@ function App() {
 	// === ANALYSIS ===
 	if (step === 'analysis') {
 		return (
-			<Shell>
+			<Shell personaName={activePersonaName} onSwitchPersona={() => setStep("persona")}>
 				<div className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_380px] min-h-0">
 					<AnalysisStep
 						analysis={analysis}
 						antiPatterns={antiPatterns}
-						onStartInterview={() => { setStep('interview'); setDittoState('listening'); }}
+						onStartInterview={() => { setStep('interview'); setSpriteState('listening'); }}
 						onSkipToChat={onSkipToChat}
 					/>
 					{showSoul && <SoulPanel soulMd={soulMd} spriteState={spriteState} label="from writing analysis" />}
@@ -376,7 +493,7 @@ function App() {
 	// === INTERVIEW ===
 	if (step === 'interview') {
 		return (
-			<Shell>
+			<Shell personaName={activePersonaName} onSwitchPersona={() => setStep("persona")}>
 				<div className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_380px] min-h-0">
 					<InterviewStep
 						question={currentQuestion}
@@ -394,7 +511,7 @@ function App() {
 
 	// === CHAT / INTERVIEW / ACTIONS + SOUL ===
 	return (
-		<Shell>
+		<Shell personaName={activePersonaName} onSwitchPersona={() => setStep("persona")}>
 			{/* Mode tabs */}
 			<div className="border-b px-6 flex items-center gap-1 shrink-0">
 				{[
@@ -440,13 +557,21 @@ function App() {
 	);
 }
 
-function Shell({ children }: { children: React.ReactNode }) {
+function Shell({ children, personaName, onSwitchPersona }: { children: React.ReactNode; personaName?: string; onSwitchPersona?: () => void; }) {
 	return (
 		<div className="min-h-screen bg-background flex flex-col">
-			<header className="border-b px-6 py-2.5 shrink-0">
+			<header className="border-b px-6 py-2.5 shrink-0 flex items-center justify-between">
 				<span className="text-sm font-bold tracking-tight ditto-text">
 					ditto
 				</span>
+				{personaName && (
+					<button
+						onClick={onSwitchPersona}
+						className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+					>
+						{personaName} ↗
+					</button>
+				)}
 			</header>
 			{children}
 		</div>

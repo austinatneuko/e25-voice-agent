@@ -120,6 +120,18 @@ export const api = {
 	clearHistory: () => del('/api/chat/history'),
 	soulMd: () => getText('/api/profile/soul'),
 
+	// Personas
+	listPersonas: () =>
+		get<{ personas: Array<{ id: string; name: string; createdAt: string; active: boolean }> }>(
+			'/api/persona',
+		),
+	createPersona: (name: string) =>
+		post<{ created: boolean; id: string; name: string }>('/api/persona', { name }),
+	switchPersona: (id: string) =>
+		post<{ switched: boolean; id: string; name: string }>('/api/persona/switch', { id }),
+	clearSamples: () => del('/api/persona/samples'),
+	resetPersona: () => del('/api/persona/reset'),
+
 	tts: async (text: string): Promise<HTMLAudioElement | null> => {
 		try {
 			const res = await fetch('/api/voice/tts', {

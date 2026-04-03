@@ -1,79 +1,66 @@
-import { useEffect, useState } from 'react';
-
 export type DittoState = 'idle' | 'reading' | 'writing' | 'listening' | 'thinking' | 'talking';
 
 const SPRITE_BASE = 'https://raw.githubusercontent.com/PMDCollab/SpriteCollab/master/sprite/0132';
 
-// Map our states to PMD animation names + frame config
-// Ditto frames are ~48x48, arranged horizontally in sprite sheets
-const STATE_MAP: Record<DittoState, { anim: string; frames: number; speed: number }> = {
-	idle: { anim: 'Idle', frames: 4, speed: 400 },
-	reading: { anim: 'Walk', frames: 4, speed: 250 },
-	writing: { anim: 'Attack', frames: 6, speed: 150 },
-	listening: { anim: 'Hop', frames: 4, speed: 300 },
-	thinking: { anim: 'Rotate', frames: 4, speed: 350 },
-	talking: { anim: 'Swing', frames: 5, speed: 200 },
-};
-
-const STATE_LABELS: Record<DittoState, string> = {
-	idle: 'chilling...',
-	reading: 'reading your writing...',
-	writing: 'updating soul...',
-	listening: 'listening...',
-	thinking: 'thinking...',
-	talking: 'speaking...',
+// Each anim sheet is 48px wide, frames stacked vertically at ~48x48 per frame
+const STATE_MAP: Record<DittoState, { anim: string; label: string }> = {
+	idle: { anim: 'Idle', label: 'chilling...' },
+	reading: { anim: 'Walk', label: 'reading your writing...' },
+	writing: { anim: 'Attack', label: 'updating soul...' },
+	listening: { anim: 'Hop', label: 'listening...' },
+	thinking: { anim: 'Rotate', label: 'thinking...' },
+	talking: { anim: 'Swing', label: 'speaking...' },
 };
 
 export function DittoSprite({
 	state,
 	size = 64,
 }: { state: DittoState; size?: number }) {
-	const [frame, setFrame] = useState(0);
 	const config = STATE_MAP[state];
 	const spriteUrl = `${SPRITE_BASE}/${config.anim}-Anim.png`;
-
-	useEffect(() => {
-		setFrame(0);
-		const interval = setInterval(() => {
-			setFrame((f) => (f + 1) % config.frames);
-		}, config.speed);
-		return () => clearInterval(interval);
-	}, [state, config.frames, config.speed]);
+	const scale = size / 48;
 
 	return (
-		<div className="flex flex-col items-center gap-1.5">
+		<div className="flex flex-col items-center gap-2">
 			<div
 				className="relative"
 				style={{ width: size, height: size }}
 			>
-				{/* Pink glow behind Ditto */}
+				{/* Soft pink glow */}
 				<div
-					className="absolute inset-0 rounded-full blur-xl opacity-40"
+					className="absolute rounded-full blur-2xl opacity-30"
 					style={{
-						background: 'radial-gradient(circle, #FF6B9D 0%, #C084FC 60%, transparent 80%)',
-						transform: 'scale(1.5)',
+						background: 'radial-gradient(circle, var(--ditto) 0%, var(--ditto-glow) 50%, transparent 70%)',
+						width: size * 1.8,
+						height: size * 1.8,
+						top: '50%',
+						left: '50%',
+						transform: 'translate(-50%, -50%)',
 					}}
 				/>
-				{/* Sprite */}
+				{/* Sprite — show first frame only, gentle bob animation */}
 				<div
+					className={state !== 'idle' ? 'animate-bounce' : ''}
 					style={{
-						width: size,
-						height: size,
+						width: 48,
+						height: 48,
 						backgroundImage: `url(${spriteUrl})`,
-						backgroundPosition: `-${frame * 48}px 0px`,
-						backgroundSize: 'auto',
+						backgroundPosition: '0px 0px',
+						backgroundSize: '48px auto',
 						backgroundRepeat: 'no-repeat',
 						imageRendering: 'pixelated',
-						transform: `scale(${size / 48})`,
+						transform: `scale(${scale})`,
 						transformOrigin: 'top left',
 						position: 'absolute',
 						top: 0,
 						left: 0,
+						animationDuration: state === 'thinking' ? '2s' : '1.2s',
+						animationTimingFunction: 'ease-in-out',
 					}}
 				/>
 			</div>
-			<span className="text-[10px] font-medium text-pink-400/80 tracking-wide">
-				{STATE_LABELS[state]}
+			<span className="text-[10px] font-medium tracking-wide" style={{ color: 'var(--ditto)' }}>
+				{config.label}
 			</span>
 		</div>
 	);
