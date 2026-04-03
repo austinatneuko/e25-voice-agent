@@ -1,6 +1,10 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { loadEnv } from './env.js';
+import { chat } from './routes/chat.js';
+import { ingest } from './routes/ingest.js';
+import { interview } from './routes/interview.js';
+import { profile } from './routes/profile.js';
 
 export function createApp() {
 	const env = loadEnv();
@@ -17,6 +21,12 @@ export function createApp() {
 			xApi: !!env.X_BEARER_TOKEN,
 		});
 	});
+
+	// API routes
+	app.route('/api/ingest', ingest);
+	app.route('/api/interview', interview);
+	app.route('/api/chat', chat);
+	app.route('/api/profile', profile);
 
 	return app;
 }
