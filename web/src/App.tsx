@@ -2,33 +2,40 @@ import { useCallback, useState } from 'react';
 import type { AnalysisResult, InterviewProgress, InterviewQuestion, SamplePreview } from '@/lib/api';
 import { api } from '@/lib/api';
 import { ChatView } from '@/components/ChatView';
-import { IngestStep } from '@/components/steps/IngestStep';
 import { AnalysisStep } from '@/components/steps/AnalysisStep';
 import { InterviewStep } from '@/components/steps/InterviewStep';
 import { SoulPanel } from '@/components/SoulPanel';
-import type { SpriteState } from '@/components/SoulSprite';
+import { SoulSprite, type SpriteState } from '@/components/SoulSprite';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Textarea } from '@/components/ui/textarea';
 
-type AppStep = 'sources' | 'ingest' | 'analysis' | 'interview' | 'chat';
+type AppStep = 'ingest' | 'analysis' | 'interview' | 'chat';
 
 function App() {
-	const [step, setStep] = useState<AppStep>('sources');
+	const [step, setStep] = useState<AppStep>('ingest');
 	const [soulMd, setSoulMd] = useState('');
 	const [spriteState, setSpriteState] = useState<SpriteState>('idle');
-	const [soulVersion, setSoulVersion] = useState(0);
 
-	// Source selection
-	const [selectedSources, setSelectedSources] = useState<Set<string>>(new Set());
-
-	// Ingest state
+	// Ingest
 	const [samples, setSamples] = useState<SamplePreview[]>([]);
+	const [text, setText] = useState('');
+	const [substackUrl, setSubstackUrl] = useState('');
+	const [xHandle, setXHandle] = useState('');
+	const [loading, setLoading] = useState(false);
+	const [loadingMsg, setLoadingMsg] = useState('');
+	const [error, setError] = useState('');
 
-	// Analysis state
+	// Analysis
 	const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
 	const [antiPatterns, setAntiPatterns] = useState<
 		Array<{ pattern: string; reason: string; example?: string }>
 	>([]);
 
-	// Interview state
+	// Interview
 	const [currentQuestion, setCurrentQuestion] = useState<InterviewQuestion | null>(null);
 	const [progress, setProgress] = useState<InterviewProgress>({
 		answered: 0,
@@ -44,32 +51,87 @@ function App() {
 	const refreshSoul = useCallback(async () => {
 		const md = await api.soulMd();
 		if (md) setSoulMd(md);
-		setSoulVersion((v) => v + 1);
 	}, []);
 
-	async function onAnalyze() {
-		setSpriteState('reading');
-		const res = await api.analyze();
-		setAnalysis(res);
-		// Fetch anti-patterns detail
+	// === Ingest actions ===
+	async function ingestText() {
+		if (!text.trim()) return;
+		setLoading(true);
+		setError('');
 		try {
-			const wp = await api.getWritingProfile();
-			setAntiPatterns(wp.antiPatterns);
-		} catch {
-			// ignore
+			await api.ingestText(text, 'pasted text');
+			setText('');
+			await refreshSamples();
+		} catch (e) {
+			setError(String(e));
+		} finally {
+			setLoading(false);
 		}
-		// Start interview + build initial soul from writing
-		const iv = await api.interviewStart();
-		setCurrentQuestion(iv.nextQuestion);
-		setProgress(iv.progress);
-		if (iv.soulMd) setSoulMd(iv.soulMd);
-		setSpriteState('idle');
-		setStep('analysis');
 	}
 
-	async function onStartInterview() {
-		setStep('interview');
-		setSpriteState('listening');
+	async function ingestSubstack() {
+		if (!substackUrl.trim()) return;
+		setLoading(true);
+		setLoadingMsg('fetching substack posts...');
+		setSpriteState('reading');
+		setError('');
+		try {
+			await api.ingestSubstack(substackUrl);
+			setSubstackUrl('');
+			await refreshSamples();
+		} catch (e) {
+			setError(`substack failed: ${e}`);
+		} finally {
+			setLoading(false);
+			setLoadingMsg('');
+			setSpriteState('idle');
+		}
+	}
+
+	async function ingestX() {
+		if (!xHandle.trim()) return;
+		setLoading(true);
+		setLoadingMsg('fetching tweets...');
+		setSpriteState('reading');
+		setError('');
+		try {
+			await api.ingestX(xHandle.replace('@', ''));
+			setXHandle('');
+			await refreshSamples();
+		} catch (e) {
+			setError(`tweet fetch failed: ${e}`);
+		} finally {
+			setLoading(false);
+			setLoadingMsg('');
+			setSpriteState('idle');
+		}
+	}
+
+	async function handleAnalyze() {
+		setLoading(true);
+		setLoadingMsg('analyzing voice (10-20s)...');
+		setSpriteState('reading');
+		setError('');
+		try {
+			const res = await api.analyze();
+			setAnalysis(res);
+			try {
+				const wp = await api.getWritingProfile();
+				setAntiPatterns(wp.antiPatterns);
+			} catch { /* ignore */ }
+			const iv = await api.interviewStart();
+			setCurrentQuestion(iv.nextQuestion);
+			setProgress(iv.progress);
+			if (iv.soulMd) setSoulMd(iv.soulMd);
+			setSpriteState('idle');
+			setStep('analysis');
+		} catch (e) {
+			setError(`analysis failed: ${e}`);
+			setSpriteState('idle');
+		} finally {
+			setLoading(false);
+			setLoadingMsg('');
+		}
 	}
 
 	async function onSkipToChat() {
@@ -87,7 +149,6 @@ function App() {
 		setProgress(res.progress);
 		if (res.soulMd) setSoulMd(res.soulMd);
 		setSpriteState('listening');
-		setSoulVersion((v) => v + 1);
 	}
 
 	async function onInterviewSkip(questionId: string) {
@@ -96,83 +157,120 @@ function App() {
 		setProgress(res.progress);
 	}
 
-	function onCorrection() {
-		refreshSoul();
-	}
-
-	const toggleSource = (s: string) => {
-		setSelectedSources((prev) => {
-			const next = new Set(prev);
-			if (next.has(s)) next.delete(s);
-			else next.add(s);
-			return next;
-		});
-	};
-
-	// Show soul panel once we have content
 	const showSoul = soulMd.length > 0;
 
-	// === SOURCE SELECTION ===
-	if (step === 'sources') {
+	// === INGEST (home page — sources + data entry in one) ===
+	if (step === 'ingest') {
 		return (
 			<Shell>
-				<div className="max-w-lg mx-auto p-8 space-y-6">
-					<div className="text-center space-y-2">
-						<h1 className="text-2xl font-semibold tracking-tight">voice agent trainer</h1>
+				<div className="max-w-2xl mx-auto p-6 space-y-4">
+					<div className="text-center space-y-2 py-4">
+						<SoulSprite state={spriteState} size="lg" />
+						<h1 className="text-xl font-semibold tracking-tight">voice agent trainer</h1>
 						<p className="text-sm text-muted-foreground">
-							choose your training sources
+							feed it your writing to learn your voice
 						</p>
 					</div>
-					<div className="grid grid-cols-1 gap-3">
-						{[
-							{ id: 'text', label: 'paste text', desc: 'blog posts, emails, messages' },
-							{ id: 'substack', label: 'substack', desc: 'import from RSS feed' },
-							{ id: 'x', label: 'x / twitter', desc: 'pull recent tweets' },
-						].map((s) => (
-							<button
-								key={s.id}
-								onClick={() => toggleSource(s.id)}
-								className={`border rounded-lg p-4 text-left transition-colors ${
-									selectedSources.has(s.id)
-										? 'border-primary bg-primary/5'
-										: 'border-border hover:border-primary/50'
-								}`}
-							>
-								<div className="font-medium text-sm">{s.label}</div>
-								<div className="text-xs text-muted-foreground">{s.desc}</div>
-							</button>
-						))}
-					</div>
-					{selectedSources.size > 0 && (
-						<button
-							onClick={() => setStep('ingest')}
-							className="w-full bg-primary text-primary-foreground py-2.5 rounded-md text-sm font-medium hover:bg-primary/90"
-						>
-							continue with {selectedSources.size} source{selectedSources.size > 1 ? 's' : ''}
-						</button>
+
+					{/* Paste text */}
+					<Card>
+						<CardHeader><CardTitle className="text-sm">paste text</CardTitle></CardHeader>
+						<CardContent className="space-y-2">
+							<Textarea
+								value={text}
+								onChange={(e) => setText(e.target.value)}
+								placeholder="tweets, blog posts, messages — anything that sounds like you..."
+								rows={3}
+								className="resize-none"
+							/>
+							<Button onClick={ingestText} disabled={loading || !text.trim()} variant="outline" size="sm" className="w-full">
+								add
+							</Button>
+						</CardContent>
+					</Card>
+
+					{/* Substack */}
+					<Card>
+						<CardContent className="p-4">
+							<div className="flex gap-2 items-center">
+								<span className="text-sm font-medium shrink-0">substack</span>
+								<Input
+									value={substackUrl}
+									onChange={(e) => setSubstackUrl(e.target.value)}
+									placeholder="yourname.substack.com"
+									className="flex-1"
+								/>
+								<Button onClick={ingestSubstack} disabled={loading || !substackUrl.trim()} variant="outline" size="sm">
+									fetch
+								</Button>
+							</div>
+						</CardContent>
+					</Card>
+
+					{/* X / Twitter */}
+					<Card>
+						<CardContent className="p-4">
+							<div className="flex gap-2 items-center">
+								<span className="text-sm font-medium shrink-0">x / twitter</span>
+								<Input
+									value={xHandle}
+									onChange={(e) => setXHandle(e.target.value)}
+									placeholder="@handle"
+									className="flex-1"
+								/>
+								<Button onClick={ingestX} disabled={loading || !xHandle.trim()} variant="outline" size="sm">
+									fetch
+								</Button>
+							</div>
+						</CardContent>
+					</Card>
+
+					{loadingMsg && <p className="text-sm text-muted-foreground animate-pulse text-center">{loadingMsg}</p>}
+					{error && <p className="text-sm text-destructive text-center">{error}</p>}
+
+					{/* Sample preview */}
+					{samples.length > 0 && (
+						<Card>
+							<CardHeader>
+								<div className="flex items-center justify-between">
+									<CardTitle className="text-sm">
+										{samples.length} sample{samples.length > 1 ? 's' : ''} loaded
+									</CardTitle>
+									<span className="text-xs text-muted-foreground">
+										{samples.reduce((sum, s) => sum + s.wordCount, 0)} words
+									</span>
+								</div>
+							</CardHeader>
+							<CardContent>
+								<ScrollArea className="max-h-48">
+									<div className="space-y-2">
+										{samples.map((s, i) => (
+											<div key={i} className="border-b pb-2 last:border-0">
+												<div className="flex items-center gap-2 mb-1">
+													<Badge variant="outline" className="text-[10px]">{s.source}</Badge>
+													{s.title && <span className="text-xs font-medium truncate">{s.title}</span>}
+													<span className="text-[10px] text-muted-foreground ml-auto">{s.wordCount}w</span>
+												</div>
+												<p className="text-xs text-muted-foreground leading-relaxed">{s.preview}</p>
+											</div>
+										))}
+									</div>
+								</ScrollArea>
+							</CardContent>
+						</Card>
+					)}
+
+					{samples.length > 0 && (
+						<Button onClick={handleAnalyze} disabled={loading} className="w-full" size="lg">
+							{loading ? loadingMsg || 'loading...' : `analyze ${samples.length} samples`}
+						</Button>
 					)}
 				</div>
 			</Shell>
 		);
 	}
 
-	// === INGEST ===
-	if (step === 'ingest') {
-		return (
-			<Shell>
-				<IngestStep
-					sources={selectedSources}
-					samples={samples}
-					onRefreshSamples={refreshSamples}
-					onAnalyze={onAnalyze}
-					spriteState={spriteState}
-					setSpriteState={setSpriteState}
-				/>
-			</Shell>
-		);
-	}
-
-	// === ANALYSIS RESULTS ===
+	// === ANALYSIS ===
 	if (step === 'analysis') {
 		return (
 			<Shell>
@@ -180,7 +278,7 @@ function App() {
 					<AnalysisStep
 						analysis={analysis}
 						antiPatterns={antiPatterns}
-						onStartInterview={onStartInterview}
+						onStartInterview={() => { setStep('interview'); setSpriteState('listening'); }}
 						onSkipToChat={onSkipToChat}
 					/>
 					{showSoul && <SoulPanel soulMd={soulMd} spriteState={spriteState} label="from writing analysis" />}
@@ -208,12 +306,12 @@ function App() {
 		);
 	}
 
-	// === CHAT + SOUL SIDE BY SIDE ===
+	// === CHAT + SOUL ===
 	return (
 		<Shell>
 			<div className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_380px] min-h-0">
 				<div className="min-h-0 border-r">
-					<ChatView onCorrection={onCorrection} />
+					<ChatView onCorrection={refreshSoul} />
 				</div>
 				<SoulPanel soulMd={soulMd} spriteState={spriteState} label="live" />
 			</div>
