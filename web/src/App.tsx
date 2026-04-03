@@ -13,12 +13,13 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Textarea } from '@/components/ui/textarea';
 
-type AppStep = 'ingest' | 'analysis' | 'interview' | 'chat';
+type AppStep = 'pick' | 'ingest' | 'analysis' | 'interview' | 'chat';
 
 function App() {
-	const [step, setStep] = useState<AppStep>('ingest');
+	const [step, setStep] = useState<AppStep>('pick');
 	const [soulMd, setSoulMd] = useState('');
 	const [spriteState, setSpriteState] = useState<SpriteState>('idle');
+	const [selectedSources, setSelectedSources] = useState<Set<string>>(new Set());
 
 	// Ingest
 	const [samples, setSamples] = useState<SamplePreview[]>([]);
@@ -53,7 +54,6 @@ function App() {
 		if (md) setSoulMd(md);
 	}, []);
 
-	// === Ingest actions ===
 	async function ingestText() {
 		if (!text.trim()) return;
 		setLoading(true);
@@ -91,7 +91,7 @@ function App() {
 	async function ingestX() {
 		if (!xHandle.trim()) return;
 		setLoading(true);
-		setLoadingMsg('fetching tweets...');
+		setLoadingMsg(`fetching tweets from @${xHandle.replace('@', '')}...`);
 		setSpriteState('reading');
 		setError('');
 		try {
@@ -157,78 +157,146 @@ function App() {
 		setProgress(res.progress);
 	}
 
+	const toggleSource = (s: string) => {
+		setSelectedSources((prev) => {
+			const next = new Set(prev);
+			if (next.has(s)) next.delete(s);
+			else next.add(s);
+			return next;
+		});
+	};
+
 	const showSoul = soulMd.length > 0;
 
-	// === INGEST (home page — sources + data entry in one) ===
+	// Group samples by source for display
+	const samplesBySource = samples.reduce<Record<string, SamplePreview[]>>((acc, s) => {
+		const key = s.source;
+		if (!acc[key]) acc[key] = [];
+		acc[key].push(s);
+		return acc;
+	}, {});
+
+	// === SOURCE PICKER ===
+	if (step === 'pick') {
+		return (
+			<Shell>
+				<div className="max-w-lg mx-auto p-8 space-y-6">
+					<div className="text-center space-y-3 py-4">
+						<SoulSprite state="idle" size="lg" />
+						<h1 className="text-2xl font-semibold tracking-tight">voice agent trainer</h1>
+						<p className="text-sm text-muted-foreground">
+							how do you want to teach it your voice?
+						</p>
+					</div>
+					<div className="grid grid-cols-1 gap-3">
+						{[
+							{ id: 'text', label: 'paste text', desc: 'blog posts, emails, messages, notes' },
+							{ id: 'substack', label: 'substack', desc: 'import posts from your RSS feed' },
+							{ id: 'x', label: 'x / twitter', desc: 'pull your recent tweets' },
+						].map((s) => (
+							<button
+								key={s.id}
+								onClick={() => toggleSource(s.id)}
+								className={`border rounded-lg p-4 text-left transition-all ${
+									selectedSources.has(s.id)
+										? 'border-primary bg-primary/5 ring-1 ring-primary'
+										: 'border-border hover:border-primary/50'
+								}`}
+							>
+								<div className="flex items-center justify-between">
+									<div>
+										<div className="font-medium text-sm">{s.label}</div>
+										<div className="text-xs text-muted-foreground">{s.desc}</div>
+									</div>
+									{selectedSources.has(s.id) && (
+										<span className="text-primary text-lg">✓</span>
+									)}
+								</div>
+							</button>
+						))}
+					</div>
+					{selectedSources.size > 0 && (
+						<Button onClick={() => setStep('ingest')} className="w-full" size="lg">
+							continue
+						</Button>
+					)}
+				</div>
+			</Shell>
+		);
+	}
+
+	// === INGEST (only shows selected sources) ===
 	if (step === 'ingest') {
 		return (
 			<Shell>
 				<div className="max-w-2xl mx-auto p-6 space-y-4">
-					<div className="text-center space-y-2 py-4">
-						<SoulSprite state={spriteState} size="lg" />
-						<h1 className="text-xl font-semibold tracking-tight">voice agent trainer</h1>
-						<p className="text-sm text-muted-foreground">
-							feed it your writing to learn your voice
-						</p>
+					<div className="flex justify-center py-2">
+						<SoulSprite state={spriteState} />
 					</div>
 
-					{/* Paste text */}
-					<Card>
-						<CardHeader><CardTitle className="text-sm">paste text</CardTitle></CardHeader>
-						<CardContent className="space-y-2">
-							<Textarea
-								value={text}
-								onChange={(e) => setText(e.target.value)}
-								placeholder="tweets, blog posts, messages — anything that sounds like you..."
-								rows={3}
-								className="resize-none"
-							/>
-							<Button onClick={ingestText} disabled={loading || !text.trim()} variant="outline" size="sm" className="w-full">
-								add
-							</Button>
-						</CardContent>
-					</Card>
-
-					{/* Substack */}
-					<Card>
-						<CardContent className="p-4">
-							<div className="flex gap-2 items-center">
-								<span className="text-sm font-medium shrink-0">substack</span>
-								<Input
-									value={substackUrl}
-									onChange={(e) => setSubstackUrl(e.target.value)}
-									placeholder="yourname.substack.com"
-									className="flex-1"
+					{selectedSources.has('text') && (
+						<Card>
+							<CardHeader><CardTitle className="text-sm">paste your writing</CardTitle></CardHeader>
+							<CardContent className="space-y-2">
+								<Textarea
+									value={text}
+									onChange={(e) => setText(e.target.value)}
+									placeholder="tweets, blog posts, messages — anything that sounds like you..."
+									rows={3}
+									className="resize-none"
 								/>
-								<Button onClick={ingestSubstack} disabled={loading || !substackUrl.trim()} variant="outline" size="sm">
-									fetch
+								<Button onClick={ingestText} disabled={loading || !text.trim()} variant="outline" size="sm" className="w-full">
+									add
 								</Button>
-							</div>
-						</CardContent>
-					</Card>
+							</CardContent>
+						</Card>
+					)}
 
-					{/* X / Twitter */}
-					<Card>
-						<CardContent className="p-4">
-							<div className="flex gap-2 items-center">
-								<span className="text-sm font-medium shrink-0">x / twitter</span>
-								<Input
-									value={xHandle}
-									onChange={(e) => setXHandle(e.target.value)}
-									placeholder="@handle"
-									className="flex-1"
-								/>
-								<Button onClick={ingestX} disabled={loading || !xHandle.trim()} variant="outline" size="sm">
-									fetch
-								</Button>
-							</div>
-						</CardContent>
-					</Card>
+					{selectedSources.has('substack') && (
+						<Card>
+							<CardHeader><CardTitle className="text-sm">substack</CardTitle></CardHeader>
+							<CardContent>
+								<div className="flex gap-2">
+									<Input
+										value={substackUrl}
+										onChange={(e) => setSubstackUrl(e.target.value)}
+										placeholder="yourname.substack.com"
+										className="flex-1"
+									/>
+									<Button onClick={ingestSubstack} disabled={loading || !substackUrl.trim()} variant="outline" size="sm">
+										fetch
+									</Button>
+								</div>
+							</CardContent>
+						</Card>
+					)}
+
+					{selectedSources.has('x') && (
+						<Card>
+							<CardHeader><CardTitle className="text-sm">x / twitter</CardTitle></CardHeader>
+							<CardContent>
+								<div className="flex gap-2">
+									<Input
+										value={xHandle}
+										onChange={(e) => setXHandle(e.target.value)}
+										placeholder="@handle"
+										className="flex-1"
+									/>
+									<Button onClick={ingestX} disabled={loading || !xHandle.trim()} variant="outline" size="sm">
+										fetch
+									</Button>
+								</div>
+								<p className="text-[10px] text-muted-foreground mt-2">
+									you can fetch multiple handles — all tweets are combined for analysis
+								</p>
+							</CardContent>
+						</Card>
+					)}
 
 					{loadingMsg && <p className="text-sm text-muted-foreground animate-pulse text-center">{loadingMsg}</p>}
 					{error && <p className="text-sm text-destructive text-center">{error}</p>}
 
-					{/* Sample preview */}
+					{/* Sample preview grouped by source */}
 					{samples.length > 0 && (
 						<Card>
 							<CardHeader>
@@ -237,21 +305,29 @@ function App() {
 										{samples.length} sample{samples.length > 1 ? 's' : ''} loaded
 									</CardTitle>
 									<span className="text-xs text-muted-foreground">
-										{samples.reduce((sum, s) => sum + s.wordCount, 0)} words
+										{samples.reduce((sum, s) => sum + s.wordCount, 0)} words total
 									</span>
 								</div>
 							</CardHeader>
 							<CardContent>
-								<ScrollArea className="max-h-48">
-									<div className="space-y-2">
-										{samples.map((s, i) => (
-											<div key={i} className="border-b pb-2 last:border-0">
-												<div className="flex items-center gap-2 mb-1">
-													<Badge variant="outline" className="text-[10px]">{s.source}</Badge>
-													{s.title && <span className="text-xs font-medium truncate">{s.title}</span>}
-													<span className="text-[10px] text-muted-foreground ml-auto">{s.wordCount}w</span>
+								<ScrollArea className="max-h-56">
+									<div className="space-y-4">
+										{Object.entries(samplesBySource).map(([source, items]) => (
+											<div key={source}>
+												<div className="flex items-center gap-2 mb-2">
+													<Badge variant="secondary" className="text-[10px]">{source}</Badge>
+													<span className="text-[10px] text-muted-foreground">
+														{items.length} sample{items.length > 1 ? 's' : ''} · {items.reduce((s, i) => s + i.wordCount, 0)}w
+													</span>
 												</div>
-												<p className="text-xs text-muted-foreground leading-relaxed">{s.preview}</p>
+												<div className="space-y-2 pl-2 border-l-2 border-muted">
+													{items.map((s, i) => (
+														<div key={i}>
+															{s.title && <span className="text-xs font-medium">{s.title} </span>}
+															<p className="text-xs text-muted-foreground leading-relaxed">{s.preview}</p>
+														</div>
+													))}
+												</div>
 											</div>
 										))}
 									</div>
@@ -260,11 +336,16 @@ function App() {
 						</Card>
 					)}
 
-					{samples.length > 0 && (
-						<Button onClick={handleAnalyze} disabled={loading} className="w-full" size="lg">
-							{loading ? loadingMsg || 'loading...' : `analyze ${samples.length} samples`}
+					<div className="flex gap-2">
+						<Button variant="outline" size="sm" onClick={() => setStep('pick')}>
+							← back
 						</Button>
-					)}
+						{samples.length > 0 && (
+							<Button onClick={handleAnalyze} disabled={loading} className="flex-1" size="lg">
+								{loading ? loadingMsg || 'loading...' : `analyze all ${samples.length} samples`}
+							</Button>
+						)}
+					</div>
 				</div>
 			</Shell>
 		);
