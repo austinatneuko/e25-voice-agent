@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { type DittoState, DittoSprite } from '@/components/DittoSprite';
+import { type Dimension, SoulRadar, buildRadarFromAnalysis } from '@/components/SoulRadar';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
@@ -7,6 +8,16 @@ interface Props {
 	soulMd: string;
 	spriteState: DittoState;
 	label?: string;
+	analysisData?: {
+		styleMarkers?: {
+			formality?: number;
+			humor?: number;
+			avgSentenceLength?: number;
+			usesAllLowercase?: boolean;
+		};
+		antiPatterns?: number;
+		sampleCount?: number;
+	} | null;
 }
 
 interface SoulDiff {
@@ -17,38 +28,20 @@ interface SoulDiff {
 function computeDiff(oldText: string, newText: string): SoulDiff[] {
 	const oldLines = oldText.split('\n');
 	const newLines = newText.split('\n');
-	const diffs: SoulDiff[] = [];
 
 	const oldSet = new Set(oldLines.map((l) => l.trim()).filter(Boolean));
 	const newSet = new Set(newLines.map((l) => l.trim()).filter(Boolean));
 
-	// Find removed lines (in old but not new)
 	const removed = new Set<string>();
 	for (const line of oldLines) {
 		if (line.trim() && !newSet.has(line.trim())) removed.add(line.trim());
 	}
-
-	// Find added lines (in new but not old)
 	const added = new Set<string>();
 	for (const line of newLines) {
 		if (line.trim() && !oldSet.has(line.trim())) added.add(line.trim());
 	}
 
-	// Build diff from new lines perspective
-	for (const line of newLines) {
-		if (added.has(line.trim())) {
-			diffs.push({ type: 'added', text: line });
-		} else {
-			diffs.push({ type: 'unchanged', text: line });
-		}
-	}
-
-	// Prepend removed lines at the positions they were
 	const finalDiffs: SoulDiff[] = [];
-	let oldIdx = 0;
-	let newIdx = 0;
-
-	// Simple approach: show removed lines, then the new content
 	if (removed.size > 0) {
 		for (const line of oldLines) {
 			if (removed.has(line.trim())) {
@@ -56,50 +49,45 @@ function computeDiff(oldText: string, newText: string): SoulDiff[] {
 			}
 		}
 	}
-	for (const d of diffs) {
-		finalDiffs.push(d);
+	for (const line of newLines) {
+		finalDiffs.push({
+			type: added.has(line.trim()) ? 'added' : 'unchanged',
+			text: line,
+		});
 	}
-
 	return finalDiffs;
 }
 
-export function SoulPanel({ soulMd, spriteState, label }: Props) {
-	const [prevSoul, setPrevSoul] = useState('');
+export function SoulPanel({ soulMd, spriteState, label, analysisData }: Props) {
 	const [pendingDiffs, setPendingDiffs] = useState<SoulDiff[] | null>(null);
 	const [approvedSoul, setApprovedSoul] = useState(soulMd);
+	const [showRadar, setShowRadar] = useState(true);
 	const lastSoulRef = useRef(soulMd);
+
+	const radarDims = buildRadarFromAnalysis(analysisData ?? null);
 
 	useEffect(() => {
 		if (soulMd === lastSoulRef.current) return;
-
 		const old = lastSoulRef.current;
 		lastSoulRef.current = soulMd;
 
-		// If we have an old version, compute diff
 		if (old && old !== soulMd) {
 			const diffs = computeDiff(old, soulMd);
-			const hasChanges = diffs.some((d) => d.type !== 'unchanged');
-			if (hasChanges) {
-				setPrevSoul(old);
+			if (diffs.some((d) => d.type !== 'unchanged')) {
 				setPendingDiffs(diffs);
-				return; // Don't auto-approve, show diff
+				return;
 			}
 		}
-
 		setApprovedSoul(soulMd);
 	}, [soulMd]);
 
 	function approveDiff() {
 		setApprovedSoul(soulMd);
 		setPendingDiffs(null);
-		setPrevSoul('');
 	}
 
 	function rejectDiff() {
-		// Keep the old version displayed (but backend still has new)
 		setPendingDiffs(null);
-		setPrevSoul('');
-		// Note: we can't revert backend, but we show the old version
 	}
 
 	return (
@@ -119,15 +107,32 @@ export function SoulPanel({ soulMd, spriteState, label }: Props) {
 					)}
 				</div>
 			</div>
-			<div className="flex justify-center py-2 border-b shrink-0">
+
+			{/* Sprite + Radar */}
+			<div className="flex flex-col items-center py-3 border-b shrink-0 gap-1">
 				<DittoSprite state={spriteState} size={48} />
+				{radarDims.length >= 3 && (
+					<button
+						onClick={() => setShowRadar(!showRadar)}
+						className="text-[9px] text-muted-foreground hover:text-foreground"
+					>
+						{showRadar ? 'hide' : 'show'} personality map
+					</button>
+				)}
 			</div>
 
-			{/* Diff approval UI */}
+			{/* Radar chart */}
+			{showRadar && radarDims.length >= 3 && (
+				<div className="border-b shrink-0 flex justify-center py-1">
+					<SoulRadar dimensions={radarDims} size={220} />
+				</div>
+			)}
+
+			{/* Diff approval */}
 			{pendingDiffs && (
 				<div className="px-4 py-2 border-b bg-amber-50 dark:bg-amber-950/20 shrink-0">
-					<div className="flex items-center justify-between mb-2">
-						<span className="text-xs font-medium">soul updated — review changes</span>
+					<div className="flex items-center justify-between">
+						<span className="text-xs font-medium">review changes</span>
 						<div className="flex gap-1">
 							<Button size="sm" variant="outline" className="h-6 text-xs px-2 text-green-700 border-green-300" onClick={approveDiff}>
 								✓ approve

@@ -484,7 +484,7 @@ function App() {
 						onStartInterview={() => { setStep('interview'); setSpriteState('listening'); }}
 						onSkipToChat={onSkipToChat}
 					/>
-					{showSoul && <SoulPanel soulMd={soulMd} spriteState={spriteState} label="from writing analysis" />}
+					{showSoul && <SoulPanel soulMd={soulMd} spriteState={spriteState} label="from writing analysis" analysisData={analysis} />}
 				</div>
 			</Shell>
 		);
@@ -503,7 +503,7 @@ function App() {
 						onSkipToChat={onSkipToChat}
 						spriteState={spriteState}
 					/>
-					{showSoul && <SoulPanel soulMd={soulMd} spriteState={spriteState} label={`updating — ${progress.answered} answers`} />}
+					{showSoul && <SoulPanel soulMd={soulMd} spriteState={spriteState} label={`updating — ${progress.answered} answers`} analysisData={analysis} />}
 				</div>
 			</Shell>
 		);
@@ -551,6 +551,7 @@ function App() {
 					soulMd={soulMd}
 					spriteState={spriteState}
 					label={chatMode === 'interview' ? `updating — ${progress.answered} answers` : 'live'}
+					analysisData={analysis}
 				/>
 			</div>
 		</Shell>
