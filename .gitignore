@@ -4,4 +4,3 @@ web/dist/
 .env
 *.tsbuildinfo
 coverage/
-.vercel
