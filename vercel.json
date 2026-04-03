@@ -4,6 +4,5 @@
 	"rewrites": [
 		{ "source": "/api/(.*)", "destination": "/api" },
 		{ "source": "/health", "destination": "/api" }
-	],
-	"framework": null
+	]
 }
