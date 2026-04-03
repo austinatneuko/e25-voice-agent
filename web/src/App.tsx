@@ -6,7 +6,7 @@ import { ChatView } from '@/components/ChatView';
 import { AnalysisStep } from '@/components/steps/AnalysisStep';
 import { InterviewStep } from '@/components/steps/InterviewStep';
 import { SoulPanel } from '@/components/SoulPanel';
-import { SoulSprite, type SpriteState } from '@/components/SoulSprite';
+import { DittoSprite, type DittoState } from '@/components/DittoSprite';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -21,7 +21,7 @@ function App() {
 	const [step, setStep] = useState<AppStep>('pick');
 	const [chatMode, setChatMode] = useState<ChatMode>('chat');
 	const [soulMd, setSoulMd] = useState('');
-	const [spriteState, setSpriteState] = useState<SpriteState>('idle');
+	const [spriteState, setDittoState] = useState<DittoState>('idle' as DittoState);
 	const [selectedSources, setSelectedSources] = useState<Set<string>>(new Set());
 
 	// Ingest
@@ -76,7 +76,7 @@ function App() {
 		if (!substackUrl.trim()) return;
 		setLoading(true);
 		setLoadingMsg('fetching substack posts...');
-		setSpriteState('reading');
+		setDittoState('reading');
 		setError('');
 		try {
 			await api.ingestSubstack(substackUrl);
@@ -87,7 +87,7 @@ function App() {
 		} finally {
 			setLoading(false);
 			setLoadingMsg('');
-			setSpriteState('idle');
+			setDittoState('idle');
 		}
 	}
 
@@ -95,7 +95,7 @@ function App() {
 		if (!xHandle.trim()) return;
 		setLoading(true);
 		setLoadingMsg(`fetching tweets from @${xHandle.replace('@', '')}...`);
-		setSpriteState('reading');
+		setDittoState('reading');
 		setError('');
 		try {
 			await api.ingestX(xHandle.replace('@', ''));
@@ -106,14 +106,14 @@ function App() {
 		} finally {
 			setLoading(false);
 			setLoadingMsg('');
-			setSpriteState('idle');
+			setDittoState('idle');
 		}
 	}
 
 	async function handleAnalyze() {
 		setLoading(true);
 		setLoadingMsg('analyzing voice (10-20s)...');
-		setSpriteState('reading');
+		setDittoState('reading');
 		setError('');
 		try {
 			const res = await api.analyze();
@@ -126,11 +126,11 @@ function App() {
 			setCurrentQuestion(iv.nextQuestion);
 			setProgress(iv.progress);
 			if (iv.soulMd) setSoulMd(iv.soulMd);
-			setSpriteState('idle');
+			setDittoState('idle');
 			setStep('analysis');
 		} catch (e) {
 			setError(`analysis failed: ${e}`);
-			setSpriteState('idle');
+			setDittoState('idle');
 		} finally {
 			setLoading(false);
 			setLoadingMsg('');
@@ -138,20 +138,20 @@ function App() {
 	}
 
 	async function onSkipToChat() {
-		setSpriteState('writing');
+		setDittoState('writing');
 		await api.buildProfile();
 		await refreshSoul();
-		setSpriteState('idle');
+		setDittoState('idle');
 		setStep('chat');
 	}
 
 	async function onInterviewAnswer(questionId: string, answer: string) {
-		setSpriteState('writing');
+		setDittoState('writing');
 		const res = await api.interviewAnswer(questionId, answer);
 		setCurrentQuestion(res.nextQuestion);
 		setProgress(res.progress);
 		if (res.soulMd) setSoulMd(res.soulMd);
-		setSpriteState('listening');
+		setDittoState('listening');
 	}
 
 	async function onInterviewSkip(questionId: string) {
@@ -183,12 +183,14 @@ function App() {
 	if (step === 'pick') {
 		return (
 			<Shell>
-				<div className="max-w-lg mx-auto p-8 space-y-6">
-					<div className="text-center space-y-3 py-4">
-						<SoulSprite state="idle" size="lg" />
-						<h1 className="text-2xl font-semibold tracking-tight">voice agent trainer</h1>
-						<p className="text-sm text-muted-foreground">
-							how do you want to teach it your voice?
+				<div className="max-w-lg mx-auto p-8 space-y-8">
+					<div className="text-center space-y-4 py-8">
+						<DittoSprite state="idle" size={96} />
+						<h1 className="text-3xl font-bold tracking-tight">
+							<span className="ditto-text">ditto</span>
+						</h1>
+						<p className="text-sm text-muted-foreground max-w-xs mx-auto leading-relaxed">
+							an agent that actually, finally, sounds like you.
 						</p>
 					</div>
 					<div className="grid grid-cols-1 gap-3">
@@ -234,7 +236,7 @@ function App() {
 			<Shell>
 				<div className="max-w-2xl mx-auto p-6 space-y-4">
 					<div className="flex justify-center py-2">
-						<SoulSprite state={spriteState} />
+						<DittoSprite state={spriteState} size={64} />
 					</div>
 
 					{selectedSources.has('text') && (
@@ -362,7 +364,7 @@ function App() {
 					<AnalysisStep
 						analysis={analysis}
 						antiPatterns={antiPatterns}
-						onStartInterview={() => { setStep('interview'); setSpriteState('listening'); }}
+						onStartInterview={() => { setStep('interview'); setDittoState('listening'); }}
 						onSkipToChat={onSkipToChat}
 					/>
 					{showSoul && <SoulPanel soulMd={soulMd} spriteState={spriteState} label="from writing analysis" />}
@@ -442,8 +444,8 @@ function Shell({ children }: { children: React.ReactNode }) {
 	return (
 		<div className="min-h-screen bg-background flex flex-col">
 			<header className="border-b px-6 py-2.5 shrink-0">
-				<span className="text-xs font-medium tracking-tight text-muted-foreground">
-					voice agent trainer
+				<span className="text-sm font-bold tracking-tight ditto-text">
+					ditto
 				</span>
 			</header>
 			{children}

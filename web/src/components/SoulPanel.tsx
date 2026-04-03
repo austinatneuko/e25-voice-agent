@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { type SpriteState, SoulSprite } from '@/components/SoulSprite';
+import { type DittoState, DittoSprite } from '@/components/DittoSprite';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface Props {
 	soulMd: string;
-	spriteState: SpriteState;
+	spriteState: DittoState;
 	label?: string;
 }
 
@@ -120,7 +120,7 @@ export function SoulPanel({ soulMd, spriteState, label }: Props) {
 				</div>
 			</div>
 			<div className="flex justify-center py-2 border-b shrink-0">
-				<SoulSprite state={spriteState} size="sm" />
+				<DittoSprite state={spriteState} size={48} />
 			</div>
 
 			{/* Diff approval UI */}

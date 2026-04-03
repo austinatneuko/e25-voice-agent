@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { InterviewProgress, InterviewQuestion } from '@/lib/api';
 import { useVoiceInput } from '@/lib/use-voice-input';
-import { type SpriteState, SoulSprite } from '@/components/SoulSprite';
+import { type DittoState, DittoSprite } from '@/components/DittoSprite';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,7 +13,7 @@ interface Props {
 	onAnswer: (questionId: string, answer: string) => Promise<void>;
 	onSkip: (questionId: string) => void;
 	onSkipToChat: () => void;
-	spriteState: SpriteState;
+	spriteState: DittoState;
 }
 
 export function InterviewStep({
@@ -52,7 +52,7 @@ export function InterviewStep({
 		<div className="p-6 space-y-4 overflow-auto">
 			<div className="flex items-center justify-between">
 				<div className="flex items-center gap-3">
-					<SoulSprite state={spriteState} size="sm" />
+					<DittoSprite state={spriteState} size={40} />
 					<div>
 						<div className="flex items-center gap-2">
 							<Badge variant="outline">{progress.currentStepName}</Badge>
