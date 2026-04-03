@@ -1,0 +1,40 @@
+{
+  "name": "e25-voice-agent",
+  "version": "0.1.0",
+  "description": "Voice agent trainer — learn an individual's writing voice via samples + interviews, deploy as chat agent",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch src/server.ts",
+    "start": "node dist/server.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "check": "biome check . && tsc --noEmit && vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "voice-agent",
+    "honcho",
+    "simulacra",
+    "hackathon"
+  ],
+  "author": "Austin",
+  "license": "MIT",
+  "dependencies": {
+    "@honcho-ai/sdk": "^2.1.0",
+    "@hono/node-server": "^1.19.12",
+    "hono": "^4.12.10",
+    "openai": "^6.33.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.10",
+    "@types/node": "^25.5.2",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.2",
+    "vitest": "^4.1.2"
+  }
+}
