@@ -5,6 +5,7 @@ import { chat } from './routes/chat.js';
 import { ingest } from './routes/ingest.js';
 import { interview } from './routes/interview.js';
 import { profile } from './routes/profile.js';
+import { sandbox } from './routes/sandbox.js';
 
 export function createApp() {
 	const env = loadEnv();
@@ -27,6 +28,7 @@ export function createApp() {
 	app.route('/api/interview', interview);
 	app.route('/api/chat', chat);
 	app.route('/api/profile', profile);
+	app.route('/api/sandbox', sandbox);
 
 	return app;
 }
