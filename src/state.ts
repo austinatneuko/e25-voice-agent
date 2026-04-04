@@ -1,6 +1,7 @@
 import type { VoiceProfile, WritingSample } from './ingestion/types.js';
 import type { InterviewState } from './interview/engine.js';
 import type { FullVoiceProfile } from './voice/types.js';
+import type { Lesson } from './voice/soul-generator.js';
 
 export interface AppState {
 	writingSamples: WritingSample[];
@@ -10,6 +11,7 @@ export interface AppState {
 	soulMd: string | null;
 	conversationHistory: Array<{ role: string; content: string }>;
 	corrections: string[];
+	lessons: Lesson[];
 }
 
 export interface Persona {
@@ -28,6 +30,7 @@ function createAppState(): AppState {
 		soulMd: null,
 		conversationHistory: [],
 		corrections: [],
+		lessons: [],
 	};
 }
 

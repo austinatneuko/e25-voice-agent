@@ -116,7 +116,15 @@ export const api = {
 
 	chat: (message: string) => post<ChatResponse>('/api/chat', { message }),
 	feedback: (correction: string) =>
-		post<{ stored: boolean; totalCorrections: number }>('/api/chat/feedback', { correction }),
+		post<{ stored: boolean; totalLessons: number; soulMd: string | null }>(
+			'/api/chat/feedback',
+			{ correction },
+		),
+	approve: (message: string) =>
+		post<{ stored: boolean; totalLessons: number; soulMd: string | null }>(
+			'/api/chat/approve',
+			{ message },
+		),
 	clearHistory: () => del('/api/chat/history'),
 	soulMd: () => getText('/api/profile/soul'),
 

@@ -534,7 +534,13 @@ function App() {
 			</div>
 			<div className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_380px] min-h-0">
 				<div className="min-h-0 border-r">
-					{chatMode === 'chat' && <ChatView onCorrection={refreshSoul} />}
+					{chatMode === 'chat' && (
+						<ChatView
+							onCorrection={(newSoulMd) => {
+								setSoulMd(newSoulMd);
+							}}
+						/>
+					)}
 					{chatMode === 'interview' && (
 						<InterviewStep
 							question={currentQuestion}

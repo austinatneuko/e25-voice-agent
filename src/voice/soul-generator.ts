@@ -8,28 +8,35 @@ import type { FullVoiceProfile } from './types.js';
  * - "Active behavioral directives need to be in the soul file."
  * - Specific anti-patterns > vague guidance
  */
-export function generateSoulMd(profile: FullVoiceProfile): string {
+export interface Lesson {
+	type: 'correction' | 'approval';
+	content: string;
+}
+
+export function generateSoulMd(
+	profile: FullVoiceProfile,
+	lessons: Lesson[] = [],
+): string {
 	const sections: string[] = [];
 
-	// Identity
 	sections.push(buildIdentitySection(profile));
-
-	// Voice Rules
 	sections.push(buildVoiceRulesSection(profile));
 
-	// Anti-Patterns (what to NEVER do)
 	if (profile.antiPatterns.length > 0) {
 		sections.push(buildAntiPatternsSection(profile));
 	}
 
-	// Social Modes
 	if (profile.socialModes) {
 		sections.push(buildSocialModesSection(profile));
 	}
 
-	// Personality
 	if (Object.keys(profile.personality).length > 0) {
 		sections.push(buildPersonalitySection(profile));
+	}
+
+	// Lessons from chat feedback
+	if (lessons.length > 0) {
+		sections.push(buildLessonsSection(lessons));
 	}
 
 	return sections.join('\n\n');
@@ -142,6 +149,30 @@ function buildPersonalitySection(profile: FullVoiceProfile): string {
 
 	for (const [key, value] of Object.entries(profile.personality)) {
 		lines.push(`**${key}**: ${value}`);
+	}
+
+	return lines.join('\n');
+}
+
+function buildLessonsSection(lessons: Lesson[]): string {
+	const corrections = lessons.filter((l) => l.type === 'correction');
+	const approvals = lessons.filter((l) => l.type === 'approval');
+
+	const lines = ['## Lessons Learned', ''];
+
+	if (corrections.length > 0) {
+		lines.push('### Things to Avoid (from feedback)', '');
+		for (const l of corrections) {
+			lines.push(`- ${l.content}`);
+		}
+	}
+
+	if (approvals.length > 0) {
+		lines.push('');
+		lines.push('### Good Examples (keep doing this)', '');
+		for (const l of approvals) {
+			lines.push(`- "${l.content}"`);
+		}
 	}
 
 	return lines.join('\n');

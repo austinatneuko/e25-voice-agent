@@ -18,7 +18,7 @@ const interview = new Hono();
 function rebuildSoul() {
 	if (!state.interviewState || state.interviewState.answers.length === 0) return;
 	state.voiceProfile = buildVoiceProfile(state.writingProfile, state.interviewState.answers);
-	state.soulMd = generateSoulMd(state.voiceProfile);
+	state.soulMd = generateSoulMd(state.voiceProfile, state.lessons);
 }
 
 /** POST /api/interview/start — Begin the interview */
@@ -28,7 +28,7 @@ interview.post('/start', async (c) => {
 	// If we have a writing profile, build initial soul from it
 	if (state.writingProfile) {
 		state.voiceProfile = buildVoiceProfile(state.writingProfile, []);
-		state.soulMd = generateSoulMd(state.voiceProfile);
+		state.soulMd = generateSoulMd(state.voiceProfile, state.lessons);
 	}
 
 	const next = getNextQuestion(state.interviewState);
@@ -134,7 +134,7 @@ interview.post('/build-profile', async (c) => {
 		// Build from writing profile alone if no interview answers
 		if (state.writingProfile) {
 			state.voiceProfile = buildVoiceProfile(state.writingProfile, []);
-			state.soulMd = generateSoulMd(state.voiceProfile);
+			state.soulMd = generateSoulMd(state.voiceProfile, state.lessons);
 		} else {
 			return c.json({ error: 'No data to build profile from' }, 400);
 		}
