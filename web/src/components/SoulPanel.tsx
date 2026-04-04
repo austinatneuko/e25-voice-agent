@@ -108,79 +108,81 @@ export function SoulPanel({ soulMd, spriteState, label, analysisData }: Props) {
 				</div>
 			</div>
 
-			{/* Sprite + Radar */}
-			<div className="flex flex-col items-center py-3 border-b shrink-0 gap-1">
-				<DittoSprite state={spriteState} size={48} />
-				{radarDims.length >= 3 && (
-					<button
-						onClick={() => setShowRadar(!showRadar)}
-						className="text-[9px] text-muted-foreground hover:text-foreground"
-					>
-						{showRadar ? 'hide' : 'show'} personality map
-					</button>
-				)}
-			</div>
+			<ScrollArea className="flex-1 min-h-0">
+				<div className="p-4 space-y-4">
+					{/* Sprite + Radar */}
+					<div className="flex flex-col items-center gap-1">
+						<DittoSprite state={spriteState} size={48} />
+						{radarDims.length >= 3 && (
+							<button
+								onClick={() => setShowRadar(!showRadar)}
+								className="text-[9px] text-muted-foreground hover:text-foreground"
+							>
+								{showRadar ? 'hide' : 'show'} personality map
+							</button>
+						)}
+					</div>
 
-			{/* Radar chart */}
-			{showRadar && radarDims.length >= 3 && (
-				<div className="border-b shrink-0 flex justify-center">
-					<SoulRadar dimensions={radarDims} size={180} />
-				</div>
-			)}
-
-			{/* Diff approval */}
-			{pendingDiffs && (
-				<div className="px-4 py-2 border-b bg-amber-50 dark:bg-amber-950/20 shrink-0">
-					<div className="flex items-center justify-between">
-						<span className="text-xs font-medium">review changes</span>
-						<div className="flex gap-1">
-							<Button size="sm" variant="outline" className="h-6 text-xs px-2 text-green-700 border-green-300" onClick={approveDiff}>
-								✓ approve
-							</Button>
-							<Button size="sm" variant="outline" className="h-6 text-xs px-2 text-red-700 border-red-300" onClick={rejectDiff}>
-								✕ reject
-							</Button>
+					{showRadar && radarDims.length >= 3 && (
+						<div className="flex justify-center">
+							<SoulRadar dimensions={radarDims} size={180} />
 						</div>
-					</div>
-				</div>
-			)}
+					)}
 
-			<ScrollArea className="flex-1 min-h-0 p-4">
-				{pendingDiffs ? (
-					<div className="space-y-0">
-						{pendingDiffs.map((d, i) => {
-							if (d.type === 'removed') {
+					{/* Diff approval */}
+					{pendingDiffs && (
+						<div className="px-3 py-2 rounded-md bg-amber-50 dark:bg-amber-950/20">
+							<div className="flex items-center justify-between">
+								<span className="text-xs font-medium">review changes</span>
+								<div className="flex gap-1">
+									<Button size="sm" variant="outline" className="h-6 text-xs px-2 text-green-700 border-green-300" onClick={approveDiff}>
+										✓ approve
+									</Button>
+									<Button size="sm" variant="outline" className="h-6 text-xs px-2 text-red-700 border-red-300" onClick={rejectDiff}>
+										✕ reject
+									</Button>
+								</div>
+							</div>
+						</div>
+					)}
+
+					{/* Soul content */}
+					{pendingDiffs ? (
+						<div className="space-y-0">
+							{pendingDiffs.map((d, i) => {
+								if (d.type === 'removed') {
+									return (
+										<div key={`r${i}`} className="bg-red-50 dark:bg-red-950/20 px-2 py-0.5 -mx-2 rounded-sm">
+											<pre className="text-[11px] whitespace-pre-wrap font-mono leading-relaxed text-red-600 line-through">
+												{d.text}
+											</pre>
+										</div>
+									);
+								}
+								if (d.type === 'added') {
+									return (
+										<div key={`a${i}`} className="bg-green-50 dark:bg-green-950/20 px-2 py-0.5 -mx-2 rounded-sm">
+											<pre className="text-[11px] whitespace-pre-wrap font-mono leading-relaxed text-green-700 font-bold">
+												{d.text}
+											</pre>
+										</div>
+									);
+								}
 								return (
-									<div key={`r${i}`} className="bg-red-50 dark:bg-red-950/20 px-2 py-0.5 -mx-2 rounded-sm">
-										<pre className="text-[11px] whitespace-pre-wrap font-mono leading-relaxed text-red-600 line-through">
-											{d.text}
-										</pre>
-									</div>
+									<pre key={`u${i}`} className="text-[11px] whitespace-pre-wrap font-mono leading-relaxed">
+										{d.text}
+									</pre>
 								);
-							}
-							if (d.type === 'added') {
-								return (
-									<div key={`a${i}`} className="bg-green-50 dark:bg-green-950/20 px-2 py-0.5 -mx-2 rounded-sm">
-										<pre className="text-[11px] whitespace-pre-wrap font-mono leading-relaxed text-green-700 font-bold">
-											{d.text}
-										</pre>
-									</div>
-								);
-							}
-							return (
-								<pre key={`u${i}`} className="text-[11px] whitespace-pre-wrap font-mono leading-relaxed">
-									{d.text}
-								</pre>
-							);
-						})}
-					</div>
-				) : approvedSoul ? (
-					<pre className="text-[11px] whitespace-pre-wrap font-mono leading-relaxed">
-						{approvedSoul}
-					</pre>
-				) : (
-					<p className="text-xs text-muted-foreground">building...</p>
-				)}
+							})}
+						</div>
+					) : approvedSoul ? (
+						<pre className="text-[11px] whitespace-pre-wrap font-mono leading-relaxed">
+							{approvedSoul}
+						</pre>
+					) : (
+						<p className="text-xs text-muted-foreground">building...</p>
+					)}
+				</div>
 			</ScrollArea>
 		</div>
 	);
