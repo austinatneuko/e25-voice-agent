@@ -113,7 +113,7 @@ export function SoulPanel({ soulMd, spriteState, label, analysisData }: Props) {
 					{/* Sprite + Radar */}
 					<div className="flex flex-col items-center gap-1">
 						<DittoSprite state={spriteState} size={48} />
-						{radarDims.length >= 3 && (
+						{radarDims.length > 0 && (
 							<button
 								onClick={() => setShowRadar(!showRadar)}
 								className="text-[9px] text-muted-foreground hover:text-foreground"
@@ -123,7 +123,7 @@ export function SoulPanel({ soulMd, spriteState, label, analysisData }: Props) {
 						)}
 					</div>
 
-					{showRadar && radarDims.length >= 3 && (
+					{showRadar && radarDims.length > 0 && (
 						<div className="flex justify-center">
 							<SoulRadar dimensions={radarDims} size={180} />
 						</div>
