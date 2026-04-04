@@ -91,7 +91,7 @@ export function SoulPanel({ soulMd, spriteState, label, analysisData }: Props) {
 	}
 
 	return (
-		<div className="flex flex-col h-[calc(100vh-2.75rem)] border-l bg-muted/30">
+		<div className="flex flex-col h-[calc(100vh-5.5rem)] border-l bg-muted/30 overflow-hidden">
 			<div className="px-4 py-3 border-b shrink-0 flex items-center justify-between">
 				<h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
 					soul.md
@@ -123,8 +123,8 @@ export function SoulPanel({ soulMd, spriteState, label, analysisData }: Props) {
 
 			{/* Radar chart */}
 			{showRadar && radarDims.length >= 3 && (
-				<div className="border-b shrink-0 flex justify-center py-1">
-					<SoulRadar dimensions={radarDims} size={220} />
+				<div className="border-b shrink-0 flex justify-center">
+					<SoulRadar dimensions={radarDims} size={180} />
 				</div>
 			)}
 
@@ -145,7 +145,7 @@ export function SoulPanel({ soulMd, spriteState, label, analysisData }: Props) {
 				</div>
 			)}
 
-			<ScrollArea className="flex-1 p-4">
+			<ScrollArea className="flex-1 min-h-0 p-4">
 				{pendingDiffs ? (
 					<div className="space-y-0">
 						{pendingDiffs.map((d, i) => {

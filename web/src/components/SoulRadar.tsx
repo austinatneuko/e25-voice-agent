@@ -16,7 +16,7 @@ interface Props {
 export function SoulRadar({ dimensions, size = 240 }: Props) {
 	if (dimensions.length < 3) return null;
 
-	const padding = 50; // extra space for labels
+	const padding = 80; // generous space for labels
 	const viewSize = size + padding * 2;
 	const cx = viewSize / 2;
 	const cy = viewSize / 2;
